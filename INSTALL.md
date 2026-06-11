@@ -40,14 +40,145 @@ The build produces `FocusForge.apk` in this folder. Move it to your phone any wa
 - **❄ Streak freeze:** every 7-day streak earns a freeze token (max 2). Miss a single day and a token is spent automatically — the chain survives. The frozen day shows blue in the heatmap.
 - **📊 Stats:** button in the header — completion %, total check-ins, longest streak per goal, and a weekly bar chart.
 
+## Publishing to the Play Store
+
+### Prerequisites
+
+| Item | Where |
+|------|-------|
+| Google Play Developer account | play.google.com/console → "Get started" → $25 one-time fee |
+| `FocusForge-release.aab` | Already built — lives in the project root |
+| Keystore file | `android/focus-forge.jks` — **back this up now**; losing it means you can never update the app |
+| Privacy policy URL | Required even for offline apps — see below |
+
+### Step 1 — Create developer account
+
+1. Go to **play.google.com/console** → click "Get started".
+2. Sign in with your Google account, pay $25.
+3. Fill in developer name, email, phone, address.
+4. Identity verification takes 2–7 days — do this first.
+
+### Step 2 — Write a privacy policy
+
+Focus Forge stores everything locally; it never sends data to a server. Still required by Google.
+
+Create a GitHub Gist (gist.github.com) or a GitHub Pages file with this text:
+
+```
+Privacy Policy for Focus Forge
+
+Focus Forge does not collect, store, or transmit any personal data.
+All habit tracking data is stored locally on your device and never leaves it.
+
+Contact: swainatul94@gmail.com
+```
+
+Make it public. Copy its URL — you will paste it in several places.
+
+### Step 3 — Create the app in Play Console
+
+1. Play Console → **Create app**.
+2. App name: **Focus Forge** | Default language: **English (UK or US)** | App: ✓ | Free: ✓.
+3. Tick both declarations → **Create app**.
+
+### Step 4 — Fill the store listing
+
+Navigate to **Dashboard → Store presence → Main store listing**.
+
+| Field | Value |
+|-------|-------|
+| App name | Focus Forge |
+| Short description | Daily habit tracker with streak freezes and reminders (≤80 chars) |
+| Full description | Track daily habits, protect streaks with freeze tokens, and get smart reminders — all offline, no account needed. |
+| App icon | 512×512 PNG — resize `resources/icon.png` to 512×512 |
+| Feature graphic | 1024×500 PNG — a simple banner (solid colour + app name is fine) |
+| Phone screenshots | At least 2 screenshots from the app; min 320px short side |
+| Privacy policy | Paste the URL from Step 2 |
+
+### Step 5 — Content rating
+
+Dashboard → **Policy → App content → Content ratings** → Start questionnaire.
+Answer honestly (habit tracker = no violence, no ads, no user interaction) → all ratings will be low. Takes ~5 minutes.
+
+### Step 6 — Upload the release
+
+1. Dashboard → **Production → Releases → Create new release**.
+2. Under "App bundles", upload **`FocusForge-release.aab`**.
+3. Release name: `1.0` | Release notes: `Initial release`.
+4. **Save → Review release → Roll out to production (100%)**.
+
+Google reviews new apps in 1–7 days. You will get an email when it goes live.
+
+---
+
 ## Updating the app later
 
-Edit `www/index.html` on the PC, then:
+### Quick sideload (debug APK, phone only)
 
 ```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 npx cap sync android
 cd android
 .\gradlew.bat assembleDebug
 ```
 
-Copy the new APK to the phone and install over the old one (data is kept).
+Copy `android\app\build\outputs\apk\debug\app-debug.apk` to the phone and install over the old one (data is kept).
+
+### Play Store update (release AAB)
+
+> Requires the keystore file to still be at `android\focus-forge.jks`.
+> If you deleted the `android\` folder, see **Restoring the signing config** below.
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+npx cap sync android
+cd android
+.\gradlew.bat bundleRelease
+```
+
+Output: `android\app\build\outputs\bundle\release\app-release.aab`
+
+Bump `versionCode` and `versionName` in `android\app\build.gradle` before each Play Store upload — Google rejects a lower or equal versionCode.
+
+Upload the AAB in Play Console → Production → Create new release.
+
+---
+
+## Restoring the signing config after `npx cap add android`
+
+If the `android\` folder is ever deleted and regenerated, two files must be recreated:
+
+**`android\keystore.properties`** (create this file — use the passwords from your secure backup):
+```properties
+storeFile=../focus-forge.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=focusforge
+keyPassword=YOUR_KEY_PASSWORD
+```
+> The actual passwords are stored in your password manager / secure backup — never commit them to git.
+
+**`android\app\build.gradle`** — add these blocks (after `apply plugin` line and inside `android {}`):
+
+```groovy
+// After "apply plugin: 'com.android.application'"
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+// Inside android { } — before defaultConfig
+signingConfigs {
+    release {
+        storeFile file(keystoreProperties['storeFile'])
+        storePassword keystoreProperties['storePassword']
+        keyAlias keystoreProperties['keyAlias']
+        keyPassword keystoreProperties['keyPassword']
+    }
+}
+
+// Inside buildTypes { release { } — add:
+signingConfig signingConfigs.release
+```
+
+The keystore itself (`android\focus-forge.jks`) must also be present — copy it back from your backup.
