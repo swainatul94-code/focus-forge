@@ -17,14 +17,18 @@
     return s;
   }
 
-  /* if exactly yesterday was missed, the streak before it is alive, and a
-     token is held -> return yesterday's key to freeze, else null */
-  function freezeSpendDay(g, todayKey) {
-    if (!(g.freezeTokens > 0)) return null;
-    const y = addDays(todayKey, -1);
-    if (g.checkins[y]) return null;                      // yesterday fine
-    if (!g.checkins[addDays(todayKey, -2)]) return null; // 2+ day gap: dead
-    return y;
+  /* walk back from yesterday over missed days; if a checked day is reached
+     before tokens run out, return the missed days to freeze (bridging the
+     gap), else [] — chain is dead or there was nothing to save. Depends only
+     on check-in history, never on when the app was last opened. */
+  function freezeSpendDays(g, todayKey) {
+    const tokens = g.freezeTokens || 0;
+    if (!tokens) return [];
+    const gap = [];
+    let k = addDays(todayKey, -1);
+    while (!g.checkins[k] && gap.length < tokens) { gap.push(k); k = addDays(k, -1); }
+    if (!gap.length || !g.checkins[k]) return []; // yesterday fine, or gap > tokens
+    return gap;
   }
 
   /* tokens to add right now: streak crossed a new multiple of 7, cap 2 held */
@@ -55,12 +59,18 @@
 
   function statsForGoal(g, todayKey) {
     const real = realCheckins(g.checkins).length;
-    const elapsed = Math.max(1, daysBetween(g.start, todayKey) + 1);
+    let elapsed = Math.max(1, daysBetween(g.start, todayKey) + 1);
+    if (g.targetDays) elapsed = Math.min(elapsed, g.targetDays); // deadline: out of target, not forever
     return {
       totalCheckins: real,
       longestStreak: longestStreak(g.checkins),
       completionPct: Math.min(100, Math.round(real / elapsed * 100))
     };
+  }
+
+  /* deadline goal whose target window has passed */
+  function isExpiredDeadline(g, todayKey) {
+    return !!g.targetDays && daysBetween(g.start, todayKey) + 1 > g.targetDays;
   }
 
   /* check-ins per week across all goals; buckets[weeks-1] = current week */
@@ -83,7 +93,9 @@
      id 3: one-shot tomorrow 09:00, only if something is pending now */
   function notificationPlan(goals, settings, todayKey) {
     if (!settings.notif) return [];
-    const pending = goals.filter(g => !g.checkins[todayKey]);
+    const active = goals.filter(g => !isExpiredDeadline(g, todayKey));
+    if (!active.length) return []; // nothing left to remind about
+    const pending = active.filter(g => !g.checkins[todayKey]);
     const n = pending.length;
     const [h, m] = (settings.time || '20:00').split(':').map(Number);
     const plan = [
@@ -110,8 +122,8 @@
     return plan;
   }
 
-  const FFLogic = { iso, parse, addDays, daysBetween, currentStreak, freezeSpendDay,
-    freezeEarn, longestStreak, statsForGoal, weeklyCounts, notificationPlan };
+  const FFLogic = { iso, parse, addDays, daysBetween, currentStreak, freezeSpendDays,
+    freezeEarn, longestStreak, statsForGoal, weeklyCounts, notificationPlan, isExpiredDeadline };
   if (typeof module !== 'undefined' && module.exports) module.exports = FFLogic;
   else global.FFLogic = FFLogic;
 })(typeof window !== 'undefined' ? window : globalThis);

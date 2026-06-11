@@ -60,9 +60,12 @@ the plugin calls; the web fallback remains for browser testing.
 ## Feature 2: Streak freeze ❄
 
 - Earn 1 token per 7 consecutive check-in days. Maximum 2 held per goal.
-- On app open: if exactly yesterday was missed, streak before it was alive,
-  and a token is available → auto-spend: yesterday is recorded as `"frozen"`
-  in `checkins` (vs `true` for real check-ins), token count decremented.
+  Earn credit (`freezesEarnedFor`) resets to 0 when a chain fully breaks.
+- On app open: walk back from yesterday over missed days; if a checked day is
+  reached before tokens run out, every missed day in the gap is recorded as
+  `"frozen"` in `checkins` (vs `true` for real check-ins) and tokens
+  decremented. Outcome depends only on check-in history, not on which days
+  the app was opened. Gap longer than held tokens = dead chain, nothing spent.
 - Frozen days count as streak-continuation but not as real check-ins in stats.
 - Heatmap renders frozen cells blue; goal card shows ❄ token count.
 - Data: `g.freezeTokens` (number), `g.freezesEarnedFor` (highest streak length

@@ -34,24 +34,34 @@ test('currentStreak is 0 after a 2-day gap', () => {
   assert.equal(L.currentStreak(days(-3, -4), TODAY), 0);
 });
 
-test('freezeSpendDay: yesterday missed, streak alive, token held -> spend', () => {
+test('freezeSpendDays: yesterday missed, streak alive, token held -> spend it', () => {
   const g = { checkins: days(-2, -3), freezeTokens: 1 };
-  assert.equal(L.freezeSpendDay(g, TODAY), '2026-06-10');
+  assert.deepEqual(L.freezeSpendDays(g, TODAY), ['2026-06-10']);
 });
 
-test('freezeSpendDay: no token -> null', () => {
+test('freezeSpendDays: no token -> nothing', () => {
   const g = { checkins: days(-2, -3), freezeTokens: 0 };
-  assert.equal(L.freezeSpendDay(g, TODAY), null);
+  assert.deepEqual(L.freezeSpendDays(g, TODAY), []);
 });
 
-test('freezeSpendDay: yesterday checked -> null', () => {
+test('freezeSpendDays: yesterday checked -> nothing', () => {
   const g = { checkins: days(-1), freezeTokens: 2 };
-  assert.equal(L.freezeSpendDay(g, TODAY), null);
+  assert.deepEqual(L.freezeSpendDays(g, TODAY), []);
 });
 
-test('freezeSpendDay: gap of 2+ days -> null (freeze covers single misses only)', () => {
+test('freezeSpendDays: 2-day gap, 2 tokens -> both days bridged', () => {
   const g = { checkins: days(-3, -4), freezeTokens: 2 };
-  assert.equal(L.freezeSpendDay(g, TODAY), null);
+  assert.deepEqual(L.freezeSpendDays(g, TODAY).sort(), ['2026-06-09', '2026-06-10']);
+});
+
+test('freezeSpendDays: gap longer than tokens -> chain dead, spend nothing', () => {
+  const g = { checkins: days(-3, -4), freezeTokens: 1 };
+  assert.deepEqual(L.freezeSpendDays(g, TODAY), []);
+});
+
+test('freezeSpendDays: no real streak behind the gap -> nothing', () => {
+  const g = { checkins: {}, freezeTokens: 2 };
+  assert.deepEqual(L.freezeSpendDays(g, TODAY), []);
 });
 
 test('freezeEarn: streak crossing 7 earns 1 token, capped at 2, no double-earn', () => {
@@ -61,6 +71,12 @@ test('freezeEarn: streak crossing 7 earns 1 token, capped at 2, no double-earn',
   assert.equal(L.freezeEarn(g, TODAY), 0);          // already credited for 7
   const g14 = { checkins: days(...Array.from({ length: 14 }, (_, i) => -i)), freezeTokens: 2, freezesEarnedFor: 7 };
   assert.equal(L.freezeEarn(g14, TODAY), 0);        // at cap of 2
+});
+
+test('statsForGoal: deadline goal completion uses target days, not elapsed', () => {
+  // 5-day deadline goal that ended days ago; 4 real check-ins -> 80%, not 4/10
+  const g = { checkins: days(-9, -8, -7, -6), start: '2026-06-02', type: 'deadline', targetDays: 5 };
+  assert.equal(L.statsForGoal(g, TODAY).completionPct, 80);
 });
 
 test('statsForGoal: completion ignores frozen days, longest streak counts them', () => {
@@ -100,4 +116,22 @@ test('notificationPlan: all checked -> reminders for tomorrow, no morning-after'
 
 test('notificationPlan: notifications off -> empty', () => {
   assert.deepEqual(L.notificationPlan([], { notif: false, time: '20:00' }, TODAY), []);
+});
+
+test('notificationPlan: no goals -> empty (nothing to nag about)', () => {
+  assert.deepEqual(L.notificationPlan([], { notif: true, time: '20:00' }, TODAY), []);
+});
+
+test('notificationPlan: only an expired deadline goal -> empty', () => {
+  const g = { id: 'd', title: 'Sprint', emoji: '🎯', checkins: {}, start: '2026-06-01', type: 'deadline', targetDays: 3 };
+  assert.deepEqual(L.notificationPlan([g], { notif: true, time: '20:00' }, TODAY), []);
+});
+
+test('notificationPlan: expired deadline goal excluded from pending count', () => {
+  const expired = { id: 'd', title: 'Sprint', emoji: '🎯', checkins: {}, start: '2026-06-01', type: 'deadline', targetDays: 3 };
+  const live = { id: 'a', title: 'Read', emoji: '📚', checkins: {}, start: TODAY, type: 'streak' };
+  const plan = L.notificationPlan([expired, live], { notif: true, time: '20:00' }, TODAY);
+  assert.match(plan[0].body, /1 goal /);
+  assert.match(plan[2].body, /Read/);
+  assert.doesNotMatch(plan[2].body, /Sprint/);
 });

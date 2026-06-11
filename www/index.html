@@ -469,7 +469,7 @@ function card(g,idx,earned){
     nextBar=`<div class="nextbadge"><span style="width:${pct}%"></span></div>`;
   }else{
     const target=g.targetDays;
-    const pct=Math.min(100,Math.round(days/target*100));
+    const pct=Math.max(0,Math.min(100,Math.round(days/target*100)));
     const remain=target-days;
     center=ring(pct);
     if(pct>=100){motiv=`✅ <b>GOAL CRUSHED.</b> ${target} days done. Take a bow.`;}
@@ -580,18 +580,21 @@ function delGoal(id){
   rescheduleNotifs();
 }
 
-/* spend freeze tokens for goals where exactly yesterday was missed */
+/* spend freeze tokens to bridge missed days; reset earn credit on dead chains */
 function syncFreezes(){
   let changed=false;
   goals.forEach(g=>{
     g.freezeTokens=g.freezeTokens||0;
     g.freezesEarnedFor=g.freezesEarnedFor||0;
-    const day=FFLogic.freezeSpendDay(g,todayKey());
-    if(day){
-      g.checkins[day]='frozen';
-      g.freezeTokens--;
+    const gap=FFLogic.freezeSpendDays(g,todayKey());
+    if(gap.length){
+      gap.forEach(d=>{g.checkins[d]='frozen';g.freezeTokens--;});
       changed=true;
       setTimeout(()=>toast('❄️',`Streak freeze used for "${g.title}" — chain saved!`),600);
+    }
+    // chain fully broke: next streak must earn tokens from scratch
+    if(g.freezesEarnedFor>0&&FFLogic.currentStreak(g.checkins,todayKey())===0){
+      g.freezesEarnedFor=0;changed=true;
     }
   });
   if(changed)save();
@@ -778,9 +781,17 @@ document.querySelectorAll('#soundSeg button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#soundSeg button').forEach(x=>x.classList.remove('sel'));
   b.classList.add('sel');
 });
-function updatePermLabel(){
+async function updatePermLabel(){
   const el=document.getElementById('notifPerm');if(!el)return;
-  if(FFNative.isNative()){el.textContent='📱 Native reminders active — they fire even when the app is closed.';return;}
+  if(FFNative.isNative()){
+    try{
+      const p=await Capacitor.Plugins.LocalNotifications.checkPermissions();
+      el.textContent=p.display==='granted'
+        ?'📱 Native reminders active — they fire even when the app is closed.'
+        :'🚫 Notifications blocked — enable them in Android Settings → Apps → Focus Forge.';
+    }catch(e){el.textContent='📱 Native reminders.';}
+    return;
+  }
   if(!('Notification'in window)){el.textContent='⚠️ This browser has no notification support.';return;}
   const p=Notification.permission;
   el.textContent=p==='granted'?'✅ Notifications allowed.'
@@ -815,7 +826,7 @@ async function testNotif(){
   if(p==='granted') fireReminder(true);
   else toast('🚫','Allow notifications in the browser first.');
 }
-function pendingCount(){return goals.filter(g=>!g.checkins[todayKey()]).length}
+function pendingCount(){return goals.filter(g=>!g.checkins[todayKey()]&&!FFLogic.isExpiredDeadline(g,todayKey())).length}
 function fireReminder(test){
   const n=pendingCount();
   if(!test&&n===0)return;
@@ -891,7 +902,7 @@ function importData(input){
         goals=incoming;
         if(d.settings)settings=Object.assign(loadSettings(),d.settings);
       }
-      save();saveSettingsStore();syncBadges();render();
+      save();saveSettingsStore();syncFreezes();syncBadges();render();rescheduleNotifs();
       requestAnimationFrame(()=>setTimeout(animateRings,60));
       closeSettings();
       toast('⬆️',`Imported ${incoming.length} goal${incoming.length===1?'':'s'}.`);
@@ -908,7 +919,7 @@ function resetAll(){
   if(!confirm('Really sure? Totally clean slate.'))return;
   localStorage.removeItem(KEY);localStorage.removeItem(SKEY);
   goals=[];settings=loadSettings();
-  closeSettings();render();
+  closeSettings();render();rescheduleNotifs();
   toast('🗑️','Clean slate. Ready to share or restart.');
 }
 
