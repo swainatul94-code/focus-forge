@@ -1,0 +1,117 @@
+/* Focus Forge pure logic — no DOM, no Capacitor. Loaded by the page
+   (window.FFLogic) and by node:test (module.exports). */
+(function (global) {
+  function iso(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+      '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function parse(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+  function addDays(k, n) { const d = parse(k); d.setDate(d.getDate() + n); return iso(d); }
+  function daysBetween(a, b) { return Math.round((parse(b) - parse(a)) / 86400000); }
+
+  /* consecutive run (real or frozen) ending today, or yesterday if today unchecked */
+  function currentStreak(checkins, todayKey) {
+    let k = todayKey, s = 0;
+    if (!checkins[k]) k = addDays(k, -1);
+    while (checkins[k]) { s++; k = addDays(k, -1); }
+    return s;
+  }
+
+  /* if exactly yesterday was missed, the streak before it is alive, and a
+     token is held -> return yesterday's key to freeze, else null */
+  function freezeSpendDay(g, todayKey) {
+    if (!(g.freezeTokens > 0)) return null;
+    const y = addDays(todayKey, -1);
+    if (g.checkins[y]) return null;                      // yesterday fine
+    if (!g.checkins[addDays(todayKey, -2)]) return null; // 2+ day gap: dead
+    return y;
+  }
+
+  /* tokens to add right now: streak crossed a new multiple of 7, cap 2 held */
+  function freezeEarn(g, todayKey) {
+    const s = currentStreak(g.checkins, todayKey);
+    const credited = g.freezesEarnedFor || 0;
+    const milestone = Math.floor(s / 7) * 7;
+    if (milestone < 7 || milestone <= credited) return 0;
+    if ((g.freezeTokens || 0) >= 2) return 0;
+    return 1;
+  }
+
+  function realCheckins(checkins) {
+    return Object.keys(checkins).filter(k => checkins[k] === true);
+  }
+
+  function longestStreak(checkins) {
+    const keys = Object.keys(checkins).sort();
+    let best = 0;
+    for (const k of keys) {
+      if (checkins[addDays(k, -1)]) continue; // not a run start
+      let len = 0, cur = k;
+      while (checkins[cur]) { len++; cur = addDays(cur, 1); }
+      best = Math.max(best, len);
+    }
+    return best;
+  }
+
+  function statsForGoal(g, todayKey) {
+    const real = realCheckins(g.checkins).length;
+    const elapsed = Math.max(1, daysBetween(g.start, todayKey) + 1);
+    return {
+      totalCheckins: real,
+      longestStreak: longestStreak(g.checkins),
+      completionPct: Math.min(100, Math.round(real / elapsed * 100))
+    };
+  }
+
+  /* check-ins per week across all goals; buckets[weeks-1] = current week */
+  function weeklyCounts(goals, todayKey, weeks) {
+    const buckets = new Array(weeks).fill(0);
+    for (const g of goals) {
+      for (const k of realCheckins(g.checkins)) {
+        const ago = daysBetween(k, todayKey);
+        if (ago < 0) continue;
+        const w = Math.floor(ago / 7);
+        if (w < weeks) buckets[weeks - 1 - w]++;
+      }
+    }
+    return buckets;
+  }
+
+  /* declarative plan; native.js turns it into plugin calls.
+     id 1: daily repeating at settings.time
+     id 2: last-chance repeating 21:30
+     id 3: one-shot tomorrow 09:00, only if something is pending now */
+  function notificationPlan(goals, settings, todayKey) {
+    if (!settings.notif) return [];
+    const pending = goals.filter(g => !g.checkins[todayKey]);
+    const n = pending.length;
+    const [h, m] = (settings.time || '20:00').split(':').map(Number);
+    const plan = [
+      {
+        id: 1, on: { hour: h, minute: m },
+        title: 'Focus Forge — check-in time',
+        body: n > 0 ? `${n} goal${n > 1 ? 's' : ''} still need a check-in today. Keep the streak alive 🔥`
+                    : 'Daily check-in time. Keep the streak alive 🔥'
+      },
+      {
+        id: 2, on: { hour: 21, minute: 30 },
+        title: 'Last chance today ⏰',
+        body: 'Still unchecked goals. A 30-second check-in saves the streak.'
+      }
+    ];
+    if (n > 0) {
+      const names = pending.slice(0, 3).map(g => g.emoji + ' ' + g.title).join(', ');
+      plan.push({
+        id: 3, at: addDays(todayKey, 1) + 'T09:00',
+        title: 'Streak at risk ⚠️',
+        body: `Yesterday you missed: ${names}${n > 3 ? '…' : ''}. Check in today to recover.`
+      });
+    }
+    return plan;
+  }
+
+  const FFLogic = { iso, parse, addDays, daysBetween, currentStreak, freezeSpendDay,
+    freezeEarn, longestStreak, statsForGoal, weeklyCounts, notificationPlan };
+  if (typeof module !== 'undefined' && module.exports) module.exports = FFLogic;
+  else global.FFLogic = FFLogic;
+})(typeof window !== 'undefined' ? window : globalThis);

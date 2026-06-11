@@ -1,0 +1,103 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const L = require('../www/logic.js');
+
+// helper: build checkins map from offsets relative to a fixed "today"
+const TODAY = '2026-06-11';
+function days(...offsets) {
+  const m = {};
+  for (const o of offsets) {
+    const d = new Date(2026, 5, 11); // June 11 2026, local
+    d.setDate(d.getDate() + o);
+    m[L.iso(d)] = true;
+  }
+  return m;
+}
+
+test('currentStreak counts consecutive days ending today', () => {
+  assert.equal(L.currentStreak(days(0, -1, -2), TODAY), 3);
+});
+
+test('currentStreak allows unchecked today (counts to yesterday)', () => {
+  assert.equal(L.currentStreak(days(-1, -2), TODAY), 2);
+});
+
+test('currentStreak treats frozen days as continuation', () => {
+  const c = days(0, -2);
+  c['2026-06-10'] = 'frozen';
+  assert.equal(L.currentStreak(c, TODAY), 3);
+});
+
+test('currentStreak is 0 after a 2-day gap', () => {
+  assert.equal(L.currentStreak(days(-3, -4), TODAY), 0);
+});
+
+test('freezeSpendDay: yesterday missed, streak alive, token held -> spend', () => {
+  const g = { checkins: days(-2, -3), freezeTokens: 1 };
+  assert.equal(L.freezeSpendDay(g, TODAY), '2026-06-10');
+});
+
+test('freezeSpendDay: no token -> null', () => {
+  const g = { checkins: days(-2, -3), freezeTokens: 0 };
+  assert.equal(L.freezeSpendDay(g, TODAY), null);
+});
+
+test('freezeSpendDay: yesterday checked -> null', () => {
+  const g = { checkins: days(-1), freezeTokens: 2 };
+  assert.equal(L.freezeSpendDay(g, TODAY), null);
+});
+
+test('freezeSpendDay: gap of 2+ days -> null (freeze covers single misses only)', () => {
+  const g = { checkins: days(-3, -4), freezeTokens: 2 };
+  assert.equal(L.freezeSpendDay(g, TODAY), null);
+});
+
+test('freezeEarn: streak crossing 7 earns 1 token, capped at 2, no double-earn', () => {
+  const g = { checkins: days(0, -1, -2, -3, -4, -5, -6), freezeTokens: 0, freezesEarnedFor: 0 };
+  assert.equal(L.freezeEarn(g, TODAY), 1);          // 7-day streak -> earn
+  g.freezeTokens = 1; g.freezesEarnedFor = 7;
+  assert.equal(L.freezeEarn(g, TODAY), 0);          // already credited for 7
+  const g14 = { checkins: days(...Array.from({ length: 14 }, (_, i) => -i)), freezeTokens: 2, freezesEarnedFor: 7 };
+  assert.equal(L.freezeEarn(g14, TODAY), 0);        // at cap of 2
+});
+
+test('statsForGoal: completion ignores frozen days, longest streak counts them', () => {
+  const c = days(0, -1, -3, -4);
+  c['2026-06-09'] = 'frozen'; // -2
+  const g = { checkins: c, start: '2026-06-02', type: 'streak' };
+  const s = L.statsForGoal(g, TODAY);
+  assert.equal(s.totalCheckins, 4);            // frozen not a real check-in
+  assert.equal(s.longestStreak, 5);            // -4..0 bridged by frozen day
+  assert.equal(s.completionPct, 40);           // 4 real / 10 elapsed days
+});
+
+test('weeklyCounts returns 8 buckets, oldest first', () => {
+  const g = { checkins: days(0, -1, -7), start: '2026-01-01', type: 'streak' };
+  const w = L.weeklyCounts([g], TODAY, 8);
+  assert.equal(w.length, 8);
+  assert.equal(w[7], 2);  // current week: today + yesterday
+  assert.equal(w[6], 1);  // previous week
+});
+
+test('notificationPlan: pending goals -> 3 notifications with correct ids', () => {
+  const goals = [{ id: 'a', title: 'Read', emoji: '📚', checkins: {}, start: TODAY, type: 'streak' }];
+  const plan = L.notificationPlan(goals, { notif: true, time: '20:00' }, TODAY);
+  assert.deepEqual(plan.map(n => n.id), [1, 2, 3]);
+  assert.match(plan[0].body, /1 goal/);
+  assert.match(plan[2].body, /Read/);
+  assert.deepEqual(plan[0].on, { hour: 20, minute: 0 });
+  assert.deepEqual(plan[1].on, { hour: 21, minute: 30 });
+  assert.equal(plan[2].at, '2026-06-12T09:00');
+});
+
+test('notificationPlan: all checked -> reminders for tomorrow, no morning-after', () => {
+  const goals = [{ id: 'a', title: 'Read', emoji: '📚', checkins: days(0), start: TODAY, type: 'streak' }];
+  const plan = L.notificationPlan(goals, { notif: true, time: '20:00' }, TODAY);
+  assert.deepEqual(plan.map(n => n.id), [1, 2]);
+});
+
+test('notificationPlan: notifications off -> empty', () => {
+  assert.deepEqual(L.notificationPlan([], { notif: false, time: '20:00' }, TODAY), []);
+});
