@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Forge — Track. Streak. Conquer.</title>
+<style>
+  :root{
+    --bg0:#0a0613; --bg1:#140a2e; --bg2:#1d0f3d;
+    --card:rgba(255,255,255,.06); --card-brd:rgba(255,255,255,.12);
+    --txt:#f3eefe; --muted:#a99 fc8; --muted2:#9b8fc4;
+    --accent:#7c3aed; --accent2:#06b6d4; --gold:#fbbf24; --flame:#fb7185;
+    --good:#34d399; --warn:#f59e0b; --bad:#f43f5e;
+    --shadow:0 18px 50px -12px rgba(0,0,0,.65);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    color:var(--txt); background:var(--bg0);
+    overflow-x:hidden; min-height:100vh; position:relative;
+  }
+  /* ---------- animated aurora background ---------- */
+  .aurora{position:fixed;inset:0;z-index:-2;overflow:hidden;background:
+    radial-gradient(1200px 800px at 15% 10%,#241152 0%,transparent 60%),
+    radial-gradient(1000px 700px at 85% 20%,#0d3a52 0%,transparent 55%),
+    radial-gradient(900px 900px at 50% 100%,#3a1054 0%,transparent 60%),
+    var(--bg0);}
+  .blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;
+    mix-blend-mode:screen;animation:drift 22s ease-in-out infinite}
+  .b1{width:420px;height:420px;background:#7c3aed;top:-80px;left:-60px}
+  .b2{width:380px;height:380px;background:#06b6d4;top:30%;right:-90px;animation-delay:-7s}
+  .b3{width:460px;height:460px;background:#db2777;bottom:-120px;left:30%;animation-delay:-13s}
+  @keyframes drift{
+    0%,100%{transform:translate(0,0) scale(1)}
+    33%{transform:translate(60px,40px) scale(1.12)}
+    66%{transform:translate(-40px,30px) scale(.92)}
+  }
+  .stars{position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:radial-gradient(1.5px 1.5px at 20% 30%,#fff6,transparent),
+      radial-gradient(1.5px 1.5px at 70% 60%,#fff5,transparent),
+      radial-gradient(1px 1px at 40% 80%,#fff4,transparent),
+      radial-gradient(1px 1px at 90% 20%,#fff5,transparent),
+      radial-gradient(1.5px 1.5px at 55% 15%,#fff4,transparent);
+    background-size:cover;animation:twinkle 6s ease-in-out infinite}
+  @keyframes twinkle{0%,100%{opacity:.5}50%{opacity:.9}}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:30px 20px 120px}
+
+  /* ---------- header ---------- */
+  header{display:flex;flex-wrap:wrap;align-items:center;gap:18px;justify-content:space-between;margin-bottom:8px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font-size:28px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:var(--shadow);
+    animation:pulseLogo 3.5s ease-in-out infinite}
+  @keyframes pulseLogo{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(-3deg)}}
+  h1{font-size:30px;font-weight:800;letter-spacing:.3px;
+    background:linear-gradient(90deg,#fff,#c4b5fd,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tagline{font-size:13px;color:var(--muted2);margin-top:2px}
+
+  .topstats{display:flex;gap:12px;flex-wrap:wrap}
+  .stat{background:var(--card);border:1px solid var(--card-brd);border-radius:14px;padding:10px 16px;
+    backdrop-filter:blur(10px);min-width:96px;text-align:center}
+  .stat .num{font-size:24px;font-weight:800;line-height:1}
+  .stat .lbl{font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:.6px;margin-top:4px}
+
+  /* ---------- motivation banner ---------- */
+  .quote{margin:22px 0;padding:18px 22px;border-radius:18px;position:relative;overflow:hidden;
+    background:linear-gradient(110deg,rgba(124,58,237,.22),rgba(6,182,212,.16));
+    border:1px solid var(--card-brd);backdrop-filter:blur(10px);box-shadow:var(--shadow)}
+  .quote .q{font-size:18px;font-weight:600;line-height:1.4}
+  .quote .a{font-size:13px;color:var(--muted2);margin-top:6px}
+  .quote::before{content:"";position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.07),transparent);
+    transform:translateX(-100%);animation:sheen 6s linear infinite}
+  @keyframes sheen{0%{transform:translateX(-100%)}60%,100%{transform:translateX(100%)}}
+
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 18px;flex-wrap:wrap}
+  .bar h2{font-size:18px;font-weight:700;color:#e9e2ff}
+  .row-btns{display:flex;gap:10px;flex-wrap:wrap}
+  button{font-family:inherit;cursor:pointer;border:none;color:var(--txt);transition:.18s}
+  .btn{padding:11px 18px;border-radius:12px;font-weight:700;font-size:14px;
+    background:linear-gradient(135deg,var(--accent),#a855f7);box-shadow:0 8px 22px -8px var(--accent)}
+  .btn:hover{transform:translateY(-2px);filter:brightness(1.1)}
+  .btn.ghost{background:var(--card);border:1px solid var(--card-brd);box-shadow:none}
+  .btn.ghost:hover{background:rgba(255,255,255,.12)}
+
+  /* ---------- goal grid ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:20px}
+  .gcard{background:var(--card);border:1px solid var(--card-brd);border-radius:22px;padding:22px;
+    backdrop-filter:blur(14px);box-shadow:var(--shadow);position:relative;overflow:hidden;
+    animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
+  .gcard::after{content:"";position:absolute;inset:0;border-radius:22px;pointer-events:none;
+    background:radial-gradient(400px 200px at 80% -20%,rgba(124,58,237,.25),transparent 60%)}
+  .ghead{display:flex;align-items:flex-start;gap:12px;position:relative;z-index:1}
+  .gemoji{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:26px;
+    background:rgba(255,255,255,.08);flex-shrink:0}
+  .gtitle{font-size:18px;font-weight:800;line-height:1.2}
+  .chip{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;margin-top:6px;
+    text-transform:uppercase;letter-spacing:.5px}
+  .chip.streak{background:rgba(251,113,133,.18);color:#fda4af}
+  .chip.deadline{background:rgba(6,182,212,.18);color:#67e8f9}
+  .del{margin-left:auto;background:transparent;color:var(--muted2);font-size:18px;width:30px;height:30px;border-radius:8px}
+  .del:hover{background:rgba(244,63,94,.2);color:#fda4af}
+
+  .gbody{display:flex;align-items:center;gap:18px;margin:18px 0 8px;position:relative;z-index:1}
+  .counter{text-align:center;flex-shrink:0}
+  .counter .big{font-size:52px;font-weight:900;line-height:.9;
+    background:linear-gradient(180deg,#fff,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .counter .sub{font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:.8px;margin-top:6px}
+
+  /* progress ring */
+  .ring{position:relative;width:118px;height:118px;flex-shrink:0}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .pct{position:absolute;inset:0;display:grid;place-items:center;font-size:22px;font-weight:800}
+  .flame{font-size:50px;filter:drop-shadow(0 0 14px rgba(251,113,133,.7));animation:flicker 1.6s ease-in-out infinite}
+  @keyframes flicker{0%,100%{transform:scale(1) rotate(-2deg)}50%{transform:scale(1.12) rotate(2deg)}}
+
+  .ginfo{flex:1;min-width:0}
+  .motiv{font-size:14px;font-weight:600;color:#e9e2ff;line-height:1.4}
+  .meta{font-size:12px;color:var(--muted2);margin-top:6px;line-height:1.5}
+
+  .nextbadge{margin-top:10px;height:8px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
+  .nextbadge>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--gold),#f59e0b);transition:width .8s cubic-bezier(.2,.8,.2,1)}
+
+  /* heatmap */
+  .heat{display:grid;grid-template-columns:repeat(14,1fr);gap:4px;margin:16px 0 6px;position:relative;z-index:1}
+  .cell{aspect-ratio:1;border-radius:4px;background:rgba(255,255,255,.07);transition:.3s}
+  .cell.lvl1{background:rgba(124,58,237,.45)}
+  .cell.lvl2{background:rgba(124,58,237,.8);box-shadow:0 0 8px rgba(124,58,237,.6)}
+  .cell.today{outline:2px solid var(--accent2);outline-offset:1px}
+
+  .gbadges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;position:relative;z-index:1}
+  .mini{font-size:18px;filter:grayscale(1) opacity(.35)}
+  .mini.on{filter:none;animation:popb .5s ease both}
+  @keyframes popb{0%{transform:scale(0) rotate(-30deg)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+
+  .gact{display:flex;gap:10px;margin-top:16px;position:relative;z-index:1}
+  .checkin{flex:1;padding:12px;border-radius:12px;font-weight:800;font-size:14px;
+    background:linear-gradient(135deg,var(--good),#10b981);box-shadow:0 8px 20px -8px var(--good)}
+  .checkin:hover{transform:translateY(-2px);filter:brightness(1.08)}
+  .checkin.done{background:rgba(255,255,255,.08);color:var(--muted2);box-shadow:none;cursor:default}
+
+  /* empty */
+  .empty{text-align:center;padding:70px 20px;color:var(--muted2)}
+  .empty .em{font-size:64px;margin-bottom:14px;animation:pulseLogo 3s ease-in-out infinite}
+
+  /* ---------- modal ---------- */
+  .ov{position:fixed;inset:0;background:rgba(5,2,15,.7);backdrop-filter:blur(6px);z-index:50;
+    display:none;align-items:center;justify-content:center;padding:20px}
+  .ov.show{display:flex;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .modal{width:100%;max-width:480px;background:linear-gradient(180deg,#1a1033,#150c2a);
+    border:1px solid var(--card-brd);border-radius:22px;padding:26px;box-shadow:var(--shadow);
+    animation:rise .35s cubic-bezier(.2,.8,.2,1);max-height:90vh;overflow:auto}
+  .modal h3{font-size:22px;margin-bottom:4px}
+  .modal p.hint{color:var(--muted2);font-size:13px;margin-bottom:18px}
+  label{display:block;font-size:13px;font-weight:700;color:#cdc2f0;margin:14px 0 6px}
+  input,select{width:100%;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.06);
+    border:1px solid var(--card-brd);color:var(--txt);font-family:inherit;font-size:15px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .emojipick{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .emojipick span{font-size:24px;width:42px;height:42px;display:grid;place-items:center;border-radius:10px;
+    background:rgba(255,255,255,.05);cursor:pointer;border:2px solid transparent}
+  .emojipick span.sel{border-color:var(--accent);background:rgba(124,58,237,.25)}
+  .seg{display:flex;gap:8px;margin-top:4px}
+  .seg button{flex:1;padding:14px;border-radius:12px;background:rgba(255,255,255,.05);border:2px solid transparent;
+    font-weight:700;text-align:left}
+  .seg button.sel{border-color:var(--accent);background:rgba(124,58,237,.2)}
+  .seg button .t{font-size:14px}
+  .seg button .d{font-size:11px;color:var(--muted2);margin-top:3px;font-weight:500}
+  .modal .acts{display:flex;gap:10px;margin-top:24px}
+  .modal .acts button{flex:1;padding:13px;border-radius:12px;font-weight:800}
+  .err{color:var(--bad);font-size:13px;margin-top:10px;display:none}
+
+  /* badges modal grid */
+  .badgegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:14px;margin-top:8px}
+  .bcard{text-align:center;padding:16px 8px;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid var(--card-brd)}
+  .bcard .ic{font-size:38px;filter:grayscale(1) opacity(.3)}
+  .bcard.on .ic{filter:none;animation:popb .5s ease both}
+  .bcard .bn{font-size:13px;font-weight:700;margin-top:8px}
+  .bcard .bd{font-size:11px;color:var(--muted2);margin-top:3px}
+  .bcard.on{border-color:var(--gold);box-shadow:0 0 22px -6px var(--gold)}
+
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:100}
+
+  /* toast */
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(120px);z-index:120;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));padding:16px 26px;border-radius:16px;
+    font-weight:800;font-size:16px;box-shadow:var(--shadow);transition:.5s cubic-bezier(.2,.8,.2,1);display:flex;align-items:center;gap:12px}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast .ti{font-size:30px}
+
+  .fab{position:fixed;bottom:28px;right:28px;z-index:40;width:64px;height:64px;border-radius:50%;font-size:30px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 14px 34px -8px var(--accent);
+    display:grid;place-items:center}
+  .fab:hover{transform:scale(1.1) rotate(90deg)}
+  @media(max-width:560px){.counter .big{font-size:42px}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="aurora"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="stars"></div>
+<canvas id="confetti"></canvas>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo">🔥</div>
+      <div>
+        <h1>Focus Forge</h1>
+        <div class="tagline">Track. Streak. Conquer. — saved on this device</div>
+      </div>
+    </div>
+    <div class="topstats">
+      <div class="stat"><div class="num" id="sGoals">0</div><div class="lbl">Goals</div></div>
+      <div class="stat"><div class="num" id="sStreak">0</div><div class="lbl">Best Streak</div></div>
+      <div class="stat"><div class="num" id="sBadges">0</div><div class="lbl">Badges</div></div>
+    </div>
+  </header>
+
+  <div class="quote">
+    <div class="q" id="qText">Discipline is choosing between what you want now and what you want most.</div>
+    <div class="a" id="qAuth">— keep going</div>
+  </div>
+
+  <div class="bar">
+    <h2>Your Goals</h2>
+    <div class="row-btns">
+      <button class="btn ghost" onclick="openSettings()">⚙️ Settings</button>
+      <button class="btn ghost" onclick="openBadges()">🏆 Trophy Shelf</button>
+      <button class="btn" onclick="openAdd()">+ New Goal</button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty">
+    <div class="em">🎯</div>
+    <div style="font-size:18px;font-weight:700;color:#e9e2ff">No goals yet</div>
+    <div style="margin-top:6px">Add a goal and start forging your streak.</div>
+    <button class="btn" style="margin-top:18px" onclick="openAdd()">+ Create first goal</button>
+  </div>
+</div>
+
+<button class="fab" onclick="openAdd()" title="New goal">+</button>
+
+<!-- add modal -->
+<div class="ov" id="addOv">
+  <div class="modal">
+    <h3>New Goal</h3>
+    <p class="hint">Pick a mode, set a date, start forging.</p>
+
+    <label>Title</label>
+    <input id="fTitle" placeholder="e.g. Read 30 min daily" maxlength="50">
+
+    <label>Icon</label>
+    <div class="emojipick" id="emojiPick"></div>
+
+    <label>Mode</label>
+    <div class="seg" id="modeSeg">
+      <button data-mode="streak" class="sel">
+        <div class="t">🔥 Streak</div><div class="d">Only a start date. Count days, badge every 7.</div>
+      </button>
+      <button data-mode="deadline">
+        <div class="t">🎯 Deadline</div><div class="d">Target date or # days. Progress + push.</div>
+      </button>
+    </div>
+
+    <label>Start date</label>
+    <input type="date" id="fStart">
+
+    <div id="deadlineFields" style="display:none">
+      <label>Finish by <span style="color:var(--muted2);font-weight:500">(date OR days below)</span></label>
+      <input type="date" id="fEnd">
+      <label>…or number of days</label>
+      <input type="number" id="fDays" min="1" placeholder="e.g. 30">
+    </div>
+
+    <div class="err" id="addErr"></div>
+    <div class="acts">
+      <button class="btn ghost" onclick="closeAdd()">Cancel</button>
+      <button class="btn" onclick="saveGoal()">Forge it 🔨</button>
+    </div>
+  </div>
+</div>
+
+<!-- badges modal -->
+<div class="ov" id="badgeOv">
+  <div class="modal">
+    <h3>🏆 Trophy Shelf</h3>
+    <p class="hint" id="badgeSummary">Earn badges by stacking days.</p>
+    <div class="badgegrid" id="badgeGrid"></div>
+    <div class="acts"><button class="btn" onclick="closeBadges()">Done</button></div>
+  </div>
+</div>
+
+<!-- settings modal -->
+<div class="ov" id="setOv">
+  <div class="modal">
+    <h3>⚙️ Settings</h3>
+    <p class="hint">Reminders + reset. Everything stays on this device.</p>
+
+    <label>Daily reminder</label>
+    <div class="seg" id="notifSeg">
+      <button data-on="1" class="sel"><div class="t">🔔 On</div><div class="d">Nudge me at a set time</div></button>
+      <button data-on="0"><div class="t">🔕 Off</div><div class="d">No reminders</div></button>
+    </div>
+
+    <div id="notifFields">
+      <label>Remind me at</label>
+      <input type="time" id="fNotifTime" value="20:00">
+      <p class="hint" style="margin-top:10px">⚠️ Reminder only fires while this page is open (a background tab is fine). Close the tab fully and it can't notify — no app server.</p>
+      <button class="btn ghost" style="width:100%;margin-top:6px" onclick="testNotif()">Send test notification</button>
+      <div id="notifPerm" style="font-size:13px;color:var(--muted2);margin-top:10px"></div>
+
+      <label>Reminder sound</label>
+      <div class="seg" id="soundSeg">
+        <button data-on="1" class="sel"><div class="t">🔊 On</div><div class="d">Chime when reminder fires</div></button>
+        <button data-on="0"><div class="t">🔇 Off</div><div class="d">Silent</div></button>
+      </div>
+      <button class="btn ghost" style="width:100%;margin-top:6px" onclick="playChime()">▶ Play sound</button>
+    </div>
+
+    <label style="margin-top:20px">💾 Backup</label>
+    <p class="hint" style="margin-top:0">Save your data to a file, or load it on another device/browser.</p>
+    <div class="seg">
+      <button onclick="exportData()"><div class="t">⬇️ Export JSON</div><div class="d">Download a backup</div></button>
+      <button onclick="document.getElementById('importFile').click()"><div class="t">⬆️ Import JSON</div><div class="d">Restore from file</div></button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
+
+    <label style="margin-top:20px;color:#fda4af">Danger zone</label>
+    <button class="btn ghost" style="width:100%;border-color:rgba(244,63,94,.4)" onclick="resetAll()">🗑️ Reset everything (wipe all goals)</button>
+    <p class="hint" style="margin-top:8px">Use this to hand someone a clean copy: share <b>focus-tracker.html</b>, they open it and start fresh — their data never touches yours.</p>
+
+    <div class="acts"><button class="btn" onclick="saveSettings()">Save</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="ti">🎉</span><span id="toastMsg"></span></div>
+
+<script>
+/* ============ data ============ */
+const KEY='focusForgeGoals_v1';
+const EMOJIS=['🔥','📚','🏃','💪','🧘','💧','💻','🎨','🎸','🌱','✍️','🚭','💰','🛌','🍎'];
+const QUOTES=[
+  ["Discipline is choosing between what you want now and what you want most.","keep going"],
+  ["Small daily improvements are the key to staggering long-term results.","compound it"],
+  ["You don't have to be extreme, just consistent.","stay steady"],
+  ["The streak you protect today becomes the person you are tomorrow.","protect it"],
+  ["Motivation gets you started. Habit keeps you going.","build the habit"],
+  ["A year from now you'll wish you had started today.","start now"],
+  ["Don't break the chain.","one more day"],
+  ["Success is the sum of small efforts repeated day in and day out.","repeat"],
+  ["Fall seven times, stand up eight.","rise again"],
+  ["The secret of getting ahead is getting started.","forge on"]
+];
+const MILESTONES=[
+  {d:7,ic:'🥉',n:'First Week',desc:'7 days'},
+  {d:14,ic:'🥈',n:'Fortnight',desc:'14 days'},
+  {d:21,ic:'🥇',n:'Habit Formed',desc:'21 days'},
+  {d:30,ic:'🏅',n:'Monthly',desc:'30 days'},
+  {d:50,ic:'💎',n:'Diamond',desc:'50 days'},
+  {d:75,ic:'👑',n:'Royalty',desc:'75 days'},
+  {d:100,ic:'🏆',n:'Centurion',desc:'100 days'},
+  {d:200,ic:'🚀',n:'Unstoppable',desc:'200 days'},
+  {d:365,ic:'🌟',n:'Legend',desc:'365 days'}
+];
+
+const SKEY='focusForgeSettings_v1';
+let goals=load();
+let settings=loadSettings();
+let selEmoji=EMOJIS[0], selMode='streak';
+
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
+function save(){localStorage.setItem(KEY,JSON.stringify(goals))}
+function loadSettings(){try{return Object.assign({notif:false,time:'20:00',sound:true},JSON.parse(localStorage.getItem(SKEY))||{})}catch(e){return{notif:false,time:'20:00',sound:true}}}
+function saveSettingsStore(){localStorage.setItem(SKEY,JSON.stringify(settings))}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+
+/* ============ date helpers ============ */
+function todayKey(){const d=new Date();return iso(d)}
+function iso(d){return d.toISOString().slice(0,10)}
+function parse(k){const[y,m,dd]=k.split('-').map(Number);return new Date(y,m-1,dd)}
+function daysBetween(a,b){return Math.floor((parse(b)-parse(a))/86400000)}
+function elapsedDays(start){return daysBetween(start,todayKey())+1} // inclusive: start day = day 1
+
+/* current consecutive check-in streak ending today/yesterday */
+function currentStreak(g){
+  let s=0;let d=new Date();
+  // if today not checked, allow streak to count up to yesterday
+  if(!g.checkins[iso(d)]) d.setDate(d.getDate()-1);
+  while(g.checkins[iso(d)]){s++;d.setDate(d.getDate()-1)}
+  return s;
+}
+function totalCheckins(g){return Object.keys(g.checkins).length}
+function bestOf(g){return Math.max(g.best||0,currentStreak(g))}
+
+/* ============ render ============ */
+function render(){
+  const grid=document.getElementById('grid');
+  document.getElementById('empty').style.display=goals.length?'none':'block';
+  grid.innerHTML='';
+  let bestStreak=0,totalBadges=0;
+  goals.forEach((g,i)=>{
+    const earned=badgesFor(g);
+    totalBadges+=earned.length;
+    bestStreak=Math.max(bestStreak,g.type==='streak'?bestOf(g):currentStreak(g));
+    grid.appendChild(card(g,i,earned));
+  });
+  document.getElementById('sGoals').textContent=goals.length;
+  document.getElementById('sStreak').textContent=bestStreak;
+  document.getElementById('sBadges').textContent=totalBadges;
+}
+
+function badgesFor(g){
+  // streak badges persist via best run ever (a miss resets the live count, not earned trophies)
+  const n=g.type==='streak'?bestOf(g):elapsedDays(g.start);
+  return MILESTONES.filter(m=>n>=m.d);
+}
+
+function card(g,idx,earned){
+  const el=document.createElement('div');
+  el.className='gcard';el.style.animationDelay=(idx*0.06)+'s';
+  const days=elapsedDays(g.start);
+  const isDoneToday=!!g.checkins[todayKey()];
+
+  let center,motiv,meta='',nextBar='';
+  if(g.type==='streak'){
+    const now=currentStreak(g), best=bestOf(g);
+    const nextM=MILESTONES.find(m=>now<m.d);
+    const toGo=nextM?nextM.d-now:0;
+    const prevD=nextM?(MILESTONES.filter(m=>m.d<nextM.d).pop()?.d||0):0;
+    const pct=nextM?((now-prevD)/(nextM.d-prevD))*100:100;
+    center=`<div class="counter"><div class="big" data-to="${now}">0</div><div class="sub">Day Streak</div></div>`;
+    if(now===0){
+      motiv=totalCheckins(g)>0
+        ? `🔄 <b>Chain broke</b> — a day got missed. Check in today to restart.`
+        : `🌱 Day 0. Check in today to ignite the streak.`;
+    }else if(!isDoneToday){
+      motiv=`⚠️ <b>${now}-day</b> streak on the line. Check in today to keep it alive!`;
+    }else if(nextM){
+      motiv=`🔥 ${now} days strong. ${toGo} day${toGo>1?'s':''} to <b>${nextM.ic} ${nextM.n}</b>.`;
+    }else{
+      motiv=`🌟 Legend — ${now} days. Untouchable.`;
+    }
+    meta=`Started ${pretty(g.start)} · best run ${best} day${best===1?'':'s'} · miss a day = reset`;
+    nextBar=`<div class="nextbadge"><span style="width:${pct}%"></span></div>`;
+  }else{
+    const target=g.targetDays;
+    const pct=Math.min(100,Math.round(days/target*100));
+    const remain=target-days;
+    center=ring(pct);
+    if(pct>=100){motiv=`✅ <b>GOAL CRUSHED.</b> ${target} days done. Take a bow.`;}
+    else if(remain<=0){motiv=`⏰ Deadline passed. Finish strong or reset the clock.`;}
+    else{motiv=pushLine(pct)+` <b>${remain}</b> day${remain>1?'s':''} left.`;}
+    meta=`Day ${Math.min(days,target)} of ${target} · ${pretty(g.start)} → ${pretty(g.end||iso(addDays(g.start,target-1)))}`;
+  }
+
+  el.innerHTML=`
+    <div class="ghead">
+      <div class="gemoji">${g.emoji}</div>
+      <div>
+        <div class="gtitle">${esc(g.title)}</div>
+        <span class="chip ${g.type}">${g.type==='streak'?'🔥 Streak':'🎯 Deadline'}</span>
+      </div>
+      <button class="del" title="Delete" onclick="delGoal('${g.id}')">✕</button>
+    </div>
+    <div class="gbody">
+      ${center}
+      <div class="ginfo">
+        <div class="motiv">${motiv}</div>
+        <div class="meta">${meta}</div>
+        ${nextBar}
+      </div>
+    </div>
+    <div class="heat">${heat(g)}</div>
+    <div class="gbadges">${MILESTONES.map(m=>`<span class="mini ${earned.find(e=>e.d===m.d)?'on':''}" title="${m.n} (${m.desc})">${m.ic}</span>`).join('')}</div>
+    <div class="gact">
+      <button class="checkin ${isDoneToday?'done':''}" onclick="checkin('${g.id}')">
+        ${isDoneToday?'✓ Done today':'＋ Check in today'}
+      </button>
+    </div>`;
+
+  // animate counter
+  const big=el.querySelector('.big[data-to]');
+  if(big) requestAnimationFrame(()=>animateNum(big,0,+big.dataset.to,900));
+  return el;
+}
+
+function ring(pct){
+  const r=52,c=2*Math.PI*r,off=c*(1-pct/100);
+  return `<div class="ring">
+    <svg width="118" height="118">
+      <circle cx="59" cy="59" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="10"/>
+      <circle cx="59" cy="59" r="${r}" fill="none" stroke="url(#gr)" stroke-width="10" stroke-linecap="round"
+        stroke-dasharray="${c}" stroke-dashoffset="${c}" style="transition:stroke-dashoffset 1.1s cubic-bezier(.2,.8,.2,1)"
+        data-off="${off}"/>
+      <defs><linearGradient id="gr" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+    </svg>
+    <div class="pct" data-to="${pct}">0%</div>
+  </div>`;
+}
+
+function heat(g){
+  let cells='';const today=new Date();
+  for(let i=27;i>=0;i--){
+    const d=new Date(today);d.setDate(d.getDate()-i);const k=iso(d);
+    const on=g.checkins[k];const isToday=i===0;
+    const before=parse(k)<parse(g.start);
+    let cls='cell';
+    if(on)cls+=' lvl2';else if(!before)cls+=' lvl1';
+    if(isToday)cls+=' today';
+    cells+=`<div class="${cls}" title="${k}${on?' ✓':''}"></div>`;
+  }
+  return cells;
+}
+
+function pushLine(pct){
+  if(pct<25)return '🌱 Momentum building.';
+  if(pct<50)return '⚡ Quarter cleared. Keep the fire.';
+  if(pct<75)return '🚀 Halfway hero. Push.';
+  if(pct<90)return '🔥 Final stretch — don\'t blink.';
+  return '🏁 Almost there. Finish it.';
+}
+
+/* ============ actions ============ */
+function checkin(id){
+  const g=goals.find(x=>x.id===id);if(!g)return;
+  const k=todayKey();
+  if(g.checkins[k])return;
+  g.checkins[k]=true;
+  g.best=Math.max(g.best||0,currentStreak(g));
+  const before=g._lastBadgeCount||0;
+  const nowB=badgesFor(g).length;
+  save();render();
+  if(nowB>before){
+    g._lastBadgeCount=nowB;save();
+    celebrate(MILESTONES[nowB-1]);
+  }else{
+    const s=currentStreak(g);
+    toast('🔥', g.type==='streak'?`${s}-day streak! Keep it.`:'Checked in! Progress logged.');
+  }
+}
+
+function delGoal(id){
+  const g=goals.find(x=>x.id===id);
+  if(!confirm('Delete "'+(g?g.title:'')+'"? This cannot be undone.'))return;
+  goals=goals.filter(x=>x.id!==id);save();render();
+}
+
+/* check for newly-crossed milestones on load (e.g. days passed while away) */
+function syncBadges(){
+  let any=false;
+  goals.forEach(g=>{
+    if(g.type==='streak'){const cs=currentStreak(g);if((g.best||0)<cs){g.best=cs;any=true;}}
+    const n=badgesFor(g).length;
+    if(g._lastBadgeCount===undefined){g._lastBadgeCount=n;any=true;}
+    else if(n>g._lastBadgeCount){g._lastBadgeCount=n;any=true;
+      setTimeout(()=>celebrate(MILESTONES[n-1]),400);}
+  });
+  if(any)save();
+}
+
+/* ============ add modal ============ */
+function openAdd(){
+  selEmoji=EMOJIS[0];selMode='streak';
+  document.getElementById('fTitle').value='';
+  document.getElementById('fStart').value=todayKey();
+  document.getElementById('fEnd').value='';
+  document.getElementById('fDays').value='';
+  document.getElementById('addErr').style.display='none';
+  document.getElementById('emojiPick').innerHTML=EMOJIS.map((e,i)=>
+    `<span class="${i===0?'sel':''}" onclick="pickEmoji(this,'${e}')">${e}</span>`).join('');
+  setMode('streak');
+  document.getElementById('addOv').classList.add('show');
+}
+function closeAdd(){document.getElementById('addOv').classList.remove('show')}
+function pickEmoji(el,e){selEmoji=e;document.querySelectorAll('#emojiPick span').forEach(s=>s.classList.remove('sel'));el.classList.add('sel')}
+function setMode(m){
+  selMode=m;
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('sel',b.dataset.mode===m));
+  document.getElementById('deadlineFields').style.display=m==='deadline'?'block':'none';
+}
+document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+
+function saveGoal(){
+  const title=document.getElementById('fTitle').value.trim();
+  const start=document.getElementById('fStart').value;
+  const err=document.getElementById('addErr');
+  const show=m=>{err.textContent=m;err.style.display='block'};
+  if(!title)return show('Give it a title.');
+  if(!start)return show('Pick a start date.');
+  const g={id:uid(),title,emoji:selEmoji,type:selMode,start,checkins:{},created:Date.now()};
+  if(selMode==='deadline'){
+    const end=document.getElementById('fEnd').value;
+    const days=parseInt(document.getElementById('fDays').value);
+    if(end){
+      const t=daysBetween(start,end)+1;
+      if(t<1)return show('End date must be after start.');
+      g.end=end;g.targetDays=t;
+    }else if(days&&days>0){
+      g.targetDays=days;g.end=iso(addDays(start,days-1));
+    }else return show('Set a finish date OR number of days.');
+  }
+  g._lastBadgeCount=0;
+  goals.push(g);save();render();closeAdd();
+  toast(g.emoji,'Goal forged. Go get it.');
+}
+
+/* ============ badges modal ============ */
+function openBadges(){
+  const allEarned=new Set();
+  goals.forEach(g=>badgesFor(g).forEach(b=>allEarned.add(b.d)));
+  document.getElementById('badgeSummary').textContent=
+    `${allEarned.size} of ${MILESTONES.length} badge types unlocked across all goals.`;
+  document.getElementById('badgeGrid').innerHTML=MILESTONES.map(m=>
+    `<div class="bcard ${allEarned.has(m.d)?'on':''}">
+      <div class="ic">${m.ic}</div><div class="bn">${m.n}</div><div class="bd">${m.desc}</div></div>`).join('');
+  document.getElementById('badgeOv').classList.add('show');
+}
+function closeBadges(){document.getElementById('badgeOv').classList.remove('show')}
+
+/* ============ celebrate ============ */
+function celebrate(m){
+  if(!m)m={ic:'🎉',n:'Milestone'};
+  fireConfetti();
+  toast(m.ic,`Badge unlocked: ${m.n}!`);
+}
+let toastT;
+function toast(ic,msg){
+  const t=document.getElementById('toast');
+  document.querySelector('#toast .ti').textContent=ic;
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show');clearTimeout(toastT);
+  toastT=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+/* ============ confetti ============ */
+const cv=document.getElementById('confetti'),ctx=cv.getContext('2d');
+let parts=[],raf;
+function rs(){cv.width=innerWidth;cv.height=innerHeight}rs();addEventListener('resize',rs);
+function fireConfetti(){
+  const colors=['#7c3aed','#06b6d4','#fbbf24','#fb7185','#34d399','#f472b6'];
+  for(let i=0;i<160;i++){
+    parts.push({x:innerWidth/2+(Math.random()-.5)*200,y:innerHeight*.4,
+      vx:(Math.random()-.5)*14,vy:Math.random()*-16-4,
+      g:.4+Math.random()*.3,s:6+Math.random()*8,
+      c:colors[~~(Math.random()*colors.length)],r:Math.random()*6,vr:(Math.random()-.5)*.4,life:1});
+  }
+  if(!raf)loop();
+}
+function loop(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  parts.forEach(p=>{p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;p.life-=.008;
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.c;ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);ctx.restore();});
+  parts=parts.filter(p=>p.life>0&&p.y<innerHeight+40);
+  if(parts.length){raf=requestAnimationFrame(loop)}else{ctx.clearRect(0,0,cv.width,cv.height);raf=null}
+}
+
+/* ============ misc ============ */
+function animateNum(el,from,to,dur){
+  const st=performance.now();
+  (function step(t){const p=Math.min(1,(t-st)/dur);const e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(from+(to-from)*e)+(el.classList.contains('pct')?'%':'');
+    if(p<1)requestAnimationFrame(step);})(st);
+}
+// trigger ring + pct animations after paint
+function animateRings(){
+  document.querySelectorAll('circle[data-off]').forEach(c=>{c.style.strokeDashoffset=c.dataset.off});
+  document.querySelectorAll('.pct[data-to]').forEach(p=>animateNum(p,0,+p.dataset.to,1100));
+}
+function addDays(k,n){const d=parse(k);d.setDate(d.getDate()+n);return d}
+function pretty(k){if(!k)return'';const d=parse(k);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})}
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+// rotating quote
+let qi=0;
+function rotateQuote(){qi=(qi+1)%QUOTES.length;
+  const q=document.querySelector('.quote .q'),a=document.querySelector('.quote .a');
+  q.style.opacity=0;a.style.opacity=0;
+  setTimeout(()=>{q.textContent=QUOTES[qi][0];a.textContent='— '+QUOTES[qi][1];
+    q.style.transition=a.style.transition='opacity .5s';q.style.opacity=1;a.style.opacity=.8;},300);
+}
+setInterval(rotateQuote,7000);
+
+/* ============ settings + notifications ============ */
+function openSettings(){
+  document.querySelectorAll('#notifSeg button').forEach(b=>b.classList.toggle('sel',(b.dataset.on==='1')===settings.notif));
+  document.querySelectorAll('#soundSeg button').forEach(b=>b.classList.toggle('sel',(b.dataset.on==='1')===(settings.sound!==false)));
+  document.getElementById('fNotifTime').value=settings.time||'20:00';
+  document.getElementById('notifFields').style.display=settings.notif?'block':'none';
+  updatePermLabel();
+  document.getElementById('setOv').classList.add('show');
+}
+function closeSettings(){document.getElementById('setOv').classList.remove('show')}
+document.querySelectorAll('#notifSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#notifSeg button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');
+  document.getElementById('notifFields').style.display=b.dataset.on==='1'?'block':'none';
+});
+document.querySelectorAll('#soundSeg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#soundSeg button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel');
+});
+function updatePermLabel(){
+  const el=document.getElementById('notifPerm');if(!el)return;
+  if(!('Notification'in window)){el.textContent='⚠️ This browser has no notification support.';return;}
+  const p=Notification.permission;
+  el.textContent=p==='granted'?'✅ Notifications allowed.'
+    :p==='denied'?'🚫 Blocked in browser settings — re-enable there to get reminders.'
+    :'ℹ️ You\'ll be asked to allow when you save.';
+}
+async function saveSettings(){
+  const on=document.querySelector('#notifSeg button.sel').dataset.on==='1';
+  settings.notif=on;
+  settings.sound=document.querySelector('#soundSeg button.sel').dataset.on==='1';
+  settings.time=document.getElementById('fNotifTime').value||'20:00';
+  settings.lastFired='';
+  if(on&&'Notification'in window&&Notification.permission==='default'){
+    try{await Notification.requestPermission();}catch(e){}
+  }
+  saveSettingsStore();updatePermLabel();closeSettings();
+  toast('⚙️', on?`Reminder set for ${settings.time}. Keep this tab open.`:'Reminders off.');
+}
+async function testNotif(){
+  if(!('Notification'in window))return toast('⚠️','No notification support.');
+  let p=Notification.permission;
+  if(p==='default') p=await Notification.requestPermission();
+  updatePermLabel();
+  if(p==='granted') fireReminder(true);
+  else toast('🚫','Allow notifications in the browser first.');
+}
+function pendingCount(){return goals.filter(g=>!g.checkins[todayKey()]).length}
+function fireReminder(test){
+  const n=pendingCount();
+  if(!test&&n===0)return;
+  if(settings.sound!==false) playChime();
+  if(!('Notification'in window)||Notification.permission!=='granted'){toast('🔔','Time to check in!');return;}
+  const body=n>0?`${n} goal${n>1?'s':''} still need a check-in today. Keep the streak alive 🔥`
+                :'All goals checked in today — nice. 🎉';
+  try{const nt=new Notification('Focus Forge — time to check in',{body,tag:'focus-forge',renotify:true});
+      nt.onclick=()=>{window.focus();nt.close();};}catch(e){toast('🔔',body);}
+}
+// minute tick: fire once per day at set time while page open (background tab OK)
+function notifTick(){
+  if(!settings.notif)return;
+  const now=new Date();
+  const hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  if(hm===settings.time && settings.lastFired!==todayKey()){
+    settings.lastFired=todayKey();saveSettingsStore();fireReminder(false);
+  }
+}
+setInterval(notifTick,30000);
+function bootReminderCheck(){
+  if(!settings.notif)return;
+  const now=new Date();
+  const hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  if(settings.time<=hm && settings.lastFired!==todayKey() && pendingCount()>0){
+    settings.lastFired=todayKey();saveSettingsStore();fireReminder(false);
+  }
+}
+/* ---- chime: 3-note rising arpeggio via WebAudio, no file ---- */
+let audioCtx;
+function playChime(){
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    const now=audioCtx.currentTime;
+    [[523.25,0],[659.25,.12],[783.99,.24],[1046.5,.36]].forEach(([f,t])=>{
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.type='sine';o.frequency.value=f;
+      o.connect(g);g.connect(audioCtx.destination);
+      const s=now+t;
+      g.gain.setValueAtTime(0,s);
+      g.gain.linearRampToValueAtTime(.25,s+.02);
+      g.gain.exponentialRampToValueAtTime(.0001,s+.28);
+      o.start(s);o.stop(s+.3);
+    });
+  }catch(e){}
+}
+
+/* ---- backup ---- */
+function exportData(){
+  const payload={app:'FocusForge',version:1,exported:new Date().toISOString(),goals,settings};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='focus-forge-backup-'+todayKey()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('⬇️','Backup downloaded.');
+}
+function importData(input){
+  const file=input.files&&input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const d=JSON.parse(reader.result);
+      const incoming=Array.isArray(d)?d:d.goals;
+      if(!Array.isArray(incoming))throw new Error('No goals array in file.');
+      const mode=confirm('OK = MERGE with current goals.\nCancel = REPLACE everything with the file.');
+      if(mode){
+        const ids=new Set(goals.map(g=>g.id));
+        incoming.forEach(g=>{if(!ids.has(g.id))goals.push(g);else{const i=goals.findIndex(x=>x.id===g.id);goals[i]=g;}});
+      }else{
+        goals=incoming;
+        if(d.settings)settings=Object.assign(loadSettings(),d.settings);
+      }
+      save();saveSettingsStore();syncBadges();render();
+      requestAnimationFrame(()=>setTimeout(animateRings,60));
+      closeSettings();
+      toast('⬆️',`Imported ${incoming.length} goal${incoming.length===1?'':'s'}.`);
+    }catch(err){
+      alert('Import failed: '+err.message+'\nPick a valid Focus Forge backup file.');
+    }
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+function resetAll(){
+  if(!confirm('Wipe ALL goals, badges and reminders on this device? Cannot be undone.'))return;
+  if(!confirm('Really sure? Totally clean slate.'))return;
+  localStorage.removeItem(KEY);localStorage.removeItem(SKEY);
+  goals=[];settings=loadSettings();
+  closeSettings();render();
+  toast('🗑️','Clean slate. Ready to share or restart.');
+}
+
+// close modals on backdrop / esc
+[['addOv',closeAdd],['badgeOv',closeBadges],['setOv',closeSettings]].forEach(([id,fn])=>{
+  document.getElementById(id).addEventListener('click',e=>{if(e.target.id===id)fn()});
+});
+addEventListener('keydown',e=>{if(e.key==='Escape'){closeAdd();closeBadges();closeSettings()}});
+
+/* ============ boot ============ */
+syncBadges();
+render();
+requestAnimationFrame(()=>setTimeout(animateRings,60));
+const q0=QUOTES[Math.floor(Math.random()*QUOTES.length)];
+document.querySelector('.quote .q').textContent=q0[0];
+document.querySelector('.quote .a').textContent='— '+q0[1];
+bootReminderCheck();
+</script>
+</body>
+</html>
