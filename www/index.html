@@ -129,6 +129,7 @@
   .cell{aspect-ratio:1;border-radius:4px;background:rgba(255,255,255,.07);transition:.3s}
   .cell.lvl1{background:rgba(124,58,237,.45)}
   .cell.lvl2{background:rgba(124,58,237,.8);box-shadow:0 0 8px rgba(124,58,237,.6)}
+  .cell.frz{background:rgba(103,232,249,.75);box-shadow:0 0 8px rgba(103,232,249,.6)}
   .cell.today{outline:2px solid var(--accent2);outline-offset:1px}
 
   .gbadges{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;position:relative;z-index:1}
@@ -183,6 +184,15 @@
   .bcard .bd{font-size:11px;color:var(--muted2);margin-top:3px}
   .bcard.on{border-color:var(--gold);box-shadow:0 0 22px -6px var(--gold)}
 
+  /* stats modal */
+  .srow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+  .srow .se{font-size:22px}.srow .sn{flex:1;font-weight:700;font-size:14px}
+  .srow .sv{font-size:12px;color:var(--muted2);text-align:right;line-height:1.5}
+  .weekchart{display:flex;align-items:flex-end;gap:6px;height:90px;margin-top:8px}
+  .weekchart .wb{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%}
+  .weekchart .wbar{width:100%;border-radius:6px 6px 0 0;background:linear-gradient(180deg,var(--accent2),var(--accent));min-height:3px;transition:height .6s cubic-bezier(.2,.8,.2,1)}
+  .weekchart .wl{font-size:10px;color:var(--muted2)}
+
   #confetti{position:fixed;inset:0;pointer-events:none;z-index:100}
 
   /* toast */
@@ -230,6 +240,7 @@
     <div class="row-btns">
       <button class="btn ghost" onclick="openSettings()">⚙️ Settings</button>
       <button class="btn ghost" onclick="openBadges()">🏆 Trophy Shelf</button>
+      <button class="btn ghost" onclick="openStats()">📊 Stats</button>
       <button class="btn" onclick="openAdd()">+ New Goal</button>
     </div>
   </div>
@@ -295,6 +306,18 @@
   </div>
 </div>
 
+<!-- stats modal -->
+<div class="ov" id="statsOv">
+  <div class="modal">
+    <h3>📊 Stats</h3>
+    <p class="hint">Real check-ins only — frozen days don't count here.</p>
+    <div id="statsBody"></div>
+    <label style="margin-top:18px">Check-ins per week (last 8 weeks)</label>
+    <div class="weekchart" id="weekChart"></div>
+    <div class="acts"><button class="btn" onclick="closeStats()">Done</button></div>
+  </div>
+</div>
+
 <!-- settings modal -->
 <div class="ov" id="setOv">
   <div class="modal">
@@ -310,7 +333,7 @@
     <div id="notifFields">
       <label>Remind me at</label>
       <input type="time" id="fNotifTime" value="20:00">
-      <p class="hint" style="margin-top:10px">⚠️ Reminder only fires while this page is open (a background tab is fine). Close the tab fully and it can't notify — no app server.</p>
+      <p class="hint" style="margin-top:10px">📱 In the app, reminders fire even when the app is closed: daily nudge at your time, last-chance at 21:30, and a morning alert if you missed a day. In a browser, reminders only fire while the tab is open.</p>
       <button class="btn ghost" style="width:100%;margin-top:6px" onclick="testNotif()">Send test notification</button>
       <div id="notifPerm" style="font-size:13px;color:var(--muted2);margin-top:10px"></div>
 
@@ -340,6 +363,8 @@
 
 <div class="toast" id="toast"><span class="ti">🎉</span><span id="toastMsg"></span></div>
 
+<script src="logic.js"></script>
+<script src="native.js"></script>
 <script>
 /* ============ data ============ */
 const KEY='focusForgeGoals_v1';
@@ -375,26 +400,21 @@ let selEmoji=EMOJIS[0], selMode='streak';
 
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
 function save(){localStorage.setItem(KEY,JSON.stringify(goals))}
-function loadSettings(){try{return Object.assign({notif:false,time:'20:00',sound:true},JSON.parse(localStorage.getItem(SKEY))||{})}catch(e){return{notif:false,time:'20:00',sound:true}}}
+function loadSettings(){try{return Object.assign({notif:true,time:'20:00',sound:true},JSON.parse(localStorage.getItem(SKEY))||{})}catch(e){return{notif:true,time:'20:00',sound:true}}}
 function saveSettingsStore(){localStorage.setItem(SKEY,JSON.stringify(settings))}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 
-/* ============ date helpers ============ */
+/* ============ date helpers (delegated to logic.js; FFLogic.iso is
+   local-time, fixing the UTC date-flip of toISOString) ============ */
 function todayKey(){const d=new Date();return iso(d)}
-function iso(d){return d.toISOString().slice(0,10)}
-function parse(k){const[y,m,dd]=k.split('-').map(Number);return new Date(y,m-1,dd)}
-function daysBetween(a,b){return Math.floor((parse(b)-parse(a))/86400000)}
+function iso(d){return FFLogic.iso(d)}
+function parse(k){return FFLogic.parse(k)}
+function daysBetween(a,b){return FFLogic.daysBetween(a,b)}
 function elapsedDays(start){return daysBetween(start,todayKey())+1} // inclusive: start day = day 1
 
-/* current consecutive check-in streak ending today/yesterday */
-function currentStreak(g){
-  let s=0;let d=new Date();
-  // if today not checked, allow streak to count up to yesterday
-  if(!g.checkins[iso(d)]) d.setDate(d.getDate()-1);
-  while(g.checkins[iso(d)]){s++;d.setDate(d.getDate()-1)}
-  return s;
-}
-function totalCheckins(g){return Object.keys(g.checkins).length}
+/* current consecutive run (real or frozen) ending today/yesterday */
+function currentStreak(g){return FFLogic.currentStreak(g.checkins,todayKey())}
+function totalCheckins(g){return Object.keys(g.checkins).filter(k=>g.checkins[k]===true).length}
 function bestOf(g){return Math.max(g.best||0,currentStreak(g))}
 
 /* ============ render ============ */
@@ -445,7 +465,7 @@ function card(g,idx,earned){
     }else{
       motiv=`🌟 Legend — ${now} days. Untouchable.`;
     }
-    meta=`Started ${pretty(g.start)} · best run ${best} day${best===1?'':'s'} · miss a day = reset`;
+    meta=`Started ${pretty(g.start)} · best run ${best} day${best===1?'':'s'} · ❄ ${g.freezeTokens||0} freeze${(g.freezeTokens||0)===1?'':'s'}`;
     nextBar=`<div class="nextbadge"><span style="width:${pct}%"></span></div>`;
   }else{
     const target=g.targetDays;
@@ -511,9 +531,9 @@ function heat(g){
     const on=g.checkins[k];const isToday=i===0;
     const before=parse(k)<parse(g.start);
     let cls='cell';
-    if(on)cls+=' lvl2';else if(!before)cls+=' lvl1';
+    if(on==='frozen')cls+=' frz';else if(on)cls+=' lvl2';else if(!before)cls+=' lvl1';
     if(isToday)cls+=' today';
-    cells+=`<div class="${cls}" title="${k}${on?' ✓':''}"></div>`;
+    cells+=`<div class="${cls}" title="${k}${on===true?' ✓':on==='frozen'?' ❄':''}"></div>`;
   }
   return cells;
 }
@@ -531,8 +551,15 @@ function checkin(id){
   const g=goals.find(x=>x.id===id);if(!g)return;
   const k=todayKey();
   if(g.checkins[k])return;
+  FFNative.buzz();
   g.checkins[k]=true;
   g.best=Math.max(g.best||0,currentStreak(g));
+  const earned=FFLogic.freezeEarn(g,todayKey());
+  if(earned){
+    g.freezeTokens=(g.freezeTokens||0)+earned;
+    g.freezesEarnedFor=Math.floor(currentStreak(g)/7)*7;
+    setTimeout(()=>toast('❄️','Streak freeze earned! Auto-protects one missed day.'),1800);
+  }
   const before=g._lastBadgeCount||0;
   const nowB=badgesFor(g).length;
   save();render();
@@ -543,12 +570,37 @@ function checkin(id){
     const s=currentStreak(g);
     toast('🔥', g.type==='streak'?`${s}-day streak! Keep it.`:'Checked in! Progress logged.');
   }
+  rescheduleNotifs();
 }
 
 function delGoal(id){
   const g=goals.find(x=>x.id===id);
   if(!confirm('Delete "'+(g?g.title:'')+'"? This cannot be undone.'))return;
   goals=goals.filter(x=>x.id!==id);save();render();
+  rescheduleNotifs();
+}
+
+/* spend freeze tokens for goals where exactly yesterday was missed */
+function syncFreezes(){
+  let changed=false;
+  goals.forEach(g=>{
+    g.freezeTokens=g.freezeTokens||0;
+    g.freezesEarnedFor=g.freezesEarnedFor||0;
+    const day=FFLogic.freezeSpendDay(g,todayKey());
+    if(day){
+      g.checkins[day]='frozen';
+      g.freezeTokens--;
+      changed=true;
+      setTimeout(()=>toast('❄️',`Streak freeze used for "${g.title}" — chain saved!`),600);
+    }
+  });
+  if(changed)save();
+}
+
+/* recompute native notification schedule from current state */
+async function rescheduleNotifs(){
+  const plan=FFLogic.notificationPlan(goals,settings,todayKey());
+  try{await FFNative.applyNotificationPlan(plan);}catch(e){}
 }
 
 /* check for newly-crossed milestones on load (e.g. days passed while away) */
@@ -606,8 +658,10 @@ function saveGoal(){
     }else return show('Set a finish date OR number of days.');
   }
   g._lastBadgeCount=0;
+  g.freezeTokens=0;g.freezesEarnedFor=0;
   goals.push(g);save();render();closeAdd();
   toast(g.emoji,'Goal forged. Go get it.');
+  rescheduleNotifs();
 }
 
 /* ============ badges modal ============ */
@@ -622,6 +676,24 @@ function openBadges(){
   document.getElementById('badgeOv').classList.add('show');
 }
 function closeBadges(){document.getElementById('badgeOv').classList.remove('show')}
+
+/* ============ stats modal ============ */
+function openStats(){
+  const body=document.getElementById('statsBody');
+  if(!goals.length){body.innerHTML='<p class="hint">No goals yet — nothing to count.</p>';}
+  else body.innerHTML=goals.map(g=>{
+    const s=FFLogic.statsForGoal(g,todayKey());
+    return `<div class="srow"><span class="se">${g.emoji}</span>
+      <span class="sn">${esc(g.title)}</span>
+      <span class="sv">${s.completionPct}% complete<br>${s.totalCheckins} check-ins · best ${s.longestStreak}d</span></div>`;
+  }).join('');
+  const w=FFLogic.weeklyCounts(goals,todayKey(),8),mx=Math.max(1,...w);
+  document.getElementById('weekChart').innerHTML=w.map((v,i)=>
+    `<div class="wb"><div class="wbar" style="height:${Math.round(v/mx*78)}px" title="${v} check-ins"></div>
+     <div class="wl">${i===7?'now':(7-i)+'w'}</div></div>`).join('');
+  document.getElementById('statsOv').classList.add('show');
+}
+function closeStats(){document.getElementById('statsOv').classList.remove('show')}
 
 /* ============ celebrate ============ */
 function celebrate(m){
@@ -708,6 +780,7 @@ document.querySelectorAll('#soundSeg button').forEach(b=>b.onclick=()=>{
 });
 function updatePermLabel(){
   const el=document.getElementById('notifPerm');if(!el)return;
+  if(FFNative.isNative()){el.textContent='📱 Native reminders active — they fire even when the app is closed.';return;}
   if(!('Notification'in window)){el.textContent='⚠️ This browser has no notification support.';return;}
   const p=Notification.permission;
   el.textContent=p==='granted'?'✅ Notifications allowed.'
@@ -720,13 +793,21 @@ async function saveSettings(){
   settings.sound=document.querySelector('#soundSeg button.sel').dataset.on==='1';
   settings.time=document.getElementById('fNotifTime').value||'20:00';
   settings.lastFired='';
-  if(on&&'Notification'in window&&Notification.permission==='default'){
-    try{await Notification.requestPermission();}catch(e){}
+  if(on){
+    const ok=await FFNative.ensurePermission();
+    if(!ok)toast('🚫','Notifications blocked — allow them in system settings.');
   }
   saveSettingsStore();updatePermLabel();closeSettings();
-  toast('⚙️', on?`Reminder set for ${settings.time}. Keep this tab open.`:'Reminders off.');
+  rescheduleNotifs();
+  toast('⚙️', on?`Reminders set for ${settings.time}.`:'Reminders off.');
 }
 async function testNotif(){
+  if(FFNative.isNative()){
+    const ok=await FFNative.ensurePermission();
+    if(!ok)return toast('🚫','Allow notifications first.');
+    await Capacitor.Plugins.LocalNotifications.schedule({notifications:[{id:99,title:'Focus Forge test 🔔',body:'Notifications are working. Streaks are safe.',schedule:{at:new Date(Date.now()+5000)}}]});
+    return toast('🔔','Test arrives in 5 seconds — close the app to prove it.');
+  }
   if(!('Notification'in window))return toast('⚠️','No notification support.');
   let p=Notification.permission;
   if(p==='default') p=await Notification.requestPermission();
@@ -832,12 +913,13 @@ function resetAll(){
 }
 
 // close modals on backdrop / esc
-[['addOv',closeAdd],['badgeOv',closeBadges],['setOv',closeSettings]].forEach(([id,fn])=>{
+[['addOv',closeAdd],['badgeOv',closeBadges],['setOv',closeSettings],['statsOv',closeStats]].forEach(([id,fn])=>{
   document.getElementById(id).addEventListener('click',e=>{if(e.target.id===id)fn()});
 });
-addEventListener('keydown',e=>{if(e.key==='Escape'){closeAdd();closeBadges();closeSettings()}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){closeAdd();closeBadges();closeSettings();closeStats()}});
 
 /* ============ boot ============ */
+syncFreezes();
 syncBadges();
 render();
 requestAnimationFrame(()=>setTimeout(animateRings,60));
@@ -845,6 +927,14 @@ const q0=QUOTES[Math.floor(Math.random()*QUOTES.length)];
 document.querySelector('.quote .q').textContent=q0[0];
 document.querySelector('.quote .a').textContent='— '+q0[1];
 bootReminderCheck();
+(async()=>{
+  if(FFNative.isNative()&&settings.notif)await FFNative.ensurePermission();
+  rescheduleNotifs();
+})();
+// re-sync when app returns to foreground (date may have rolled over)
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){syncFreezes();syncBadges();render();rescheduleNotifs();}
+});
 </script>
 </body>
 </html>
