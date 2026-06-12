@@ -171,6 +171,9 @@
   .seg button.sel{border-color:var(--accent);background:rgba(124,58,237,.2)}
   .seg button .t{font-size:14px}
   .seg button .d{font-size:11px;color:var(--muted2);margin-top:3px;font-weight:500}
+  .srow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0}
+  .srow>span{font-size:13px;color:var(--muted2);white-space:nowrap}
+  .srow select{width:auto;flex:1;max-width:58%;padding:8px 10px;font-size:13px}
   .modal .acts{display:flex;gap:10px;margin-top:24px}
   .modal .acts button{flex:1;padding:13px;border-radius:12px;font-weight:800}
   .err{color:var(--bad);font-size:13px;margin-top:10px;display:none}
@@ -343,6 +346,16 @@
         <button data-on="0"><div class="t">🔇 Off</div><div class="d">Silent</div></button>
       </div>
       <button class="btn ghost" style="width:100%;margin-top:6px" onclick="playChime()">▶ Play sound</button>
+
+      <label style="margin-top:16px">Notification tones 🎵 <span style="font-weight:500;color:var(--muted2)">(phone app)</span></label>
+      <div class="srow"><span>Daily reminder</span><select id="sndDaily" onchange="soundSel(this)"></select></div>
+      <div class="srow"><span>Last-chance 21:30</span><select id="sndLast" onchange="soundSel(this)"></select></div>
+      <div class="srow"><span>Morning alert 09:00</span><select id="sndMorning" onchange="soundSel(this)"></select></div>
+      <input type="file" id="sndFile" accept="audio/*" style="display:none" onchange="customSoundPicked(this)">
+      <div id="sndCustom" style="font-size:13px;color:var(--muted2);margin-top:4px"></div>
+
+      <div id="exactRow" style="font-size:13px;margin-top:12px"></div>
+      <p class="hint" id="reliRow" style="margin-top:8px;display:none">Reminders not arriving with the app closed? Set <b>Battery → Unrestricted</b> for Focus Forge, and don't swipe-kill the app on Xiaomi/Oppo/Vivo phones. <a href="#" onclick="FFNative.openAppSettings();return false" style="color:var(--accent2)">Open app settings</a></p>
     </div>
 
     <label style="margin-top:20px">💾 Backup</label>
@@ -400,7 +413,14 @@ let selEmoji=EMOJIS[0], selMode='streak';
 
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return[]}}
 function save(){localStorage.setItem(KEY,JSON.stringify(goals))}
-function loadSettings(){try{return Object.assign({notif:true,time:'20:00',sound:true},JSON.parse(localStorage.getItem(SKEY))||{})}catch(e){return{notif:true,time:'20:00',sound:true}}}
+function defaultSettings(){return{notif:true,time:'20:00',sound:true,sounds:{daily:'default',last:'default',morning:'default'},sndVer:1,customSound:null}}
+function loadSettings(){
+  try{
+    const s=Object.assign(defaultSettings(),JSON.parse(localStorage.getItem(SKEY))||{});
+    s.sounds=Object.assign({daily:'default',last:'default',morning:'default'},s.sounds||{});
+    return s;
+  }catch(e){return defaultSettings()}
+}
 function saveSettingsStore(){localStorage.setItem(SKEY,JSON.stringify(settings))}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 
@@ -602,6 +622,7 @@ function syncFreezes(){
 
 /* recompute native notification schedule from current state */
 async function rescheduleNotifs(){
+  try{await FFNative.ensureChannels(FFLogic.channelSpecs(settings));}catch(e){}
   const plan=FFLogic.notificationPlan(goals,settings,todayKey());
   try{await FFNative.applyNotificationPlan(plan);}catch(e){}
 }
@@ -763,11 +784,46 @@ function rotateQuote(){qi=(qi+1)%QUOTES.length;
 setInterval(rotateQuote,7000);
 
 /* ============ settings + notifications ============ */
+const SND_OPTS=[['default','System default'],['chime','Chime ✨'],['urgent','Urgent beeps 🚨'],['soft','Soft tone 🌙'],['digital','Digital 🤖'],['custom','My music 🎵']];
+const SND_IDS={daily:'sndDaily',last:'sndLast',morning:'sndMorning'};
+function fillSoundSelects(){
+  for(const[layer,elId]of Object.entries(SND_IDS)){
+    const sel=document.getElementById(elId);
+    sel.innerHTML=SND_OPTS.map(([v,t])=>`<option value="${v}">${t}</option>`).join('');
+    sel.value=(settings.sounds&&settings.sounds[layer])||'default';
+  }
+  const c=document.getElementById('sndCustom');
+  c.textContent=settings.customSound?`🎵 Imported: ${settings.customSound.name}`:'';
+}
+function soundSel(sel){
+  if(sel.value==='custom'&&!settings.customSound){
+    if(!FFNative.isNative()){toast('📱','Importing music works in the phone app.');sel.value='default';return;}
+    document.getElementById('sndFile').click();
+  }
+}
+async function customSoundPicked(input){
+  const file=input.files&&input.files[0];
+  input.value='';
+  if(!file)return;
+  try{
+    const uri=await FFNative.importCustomSound(file,settings.customSound&&settings.customSound.uri);
+    if(!uri){toast('📱','Importing music works in the phone app.');return;}
+    settings.customSound={uri,name:file.name};
+    settings.sndVer=(settings.sndVer||1)+1; // channel sound is immutable -> new channel ids
+    saveSettingsStore();
+    document.getElementById('sndCustom').textContent=`🎵 Imported: ${file.name}`;
+    toast('🎵',`${file.name} imported — select "My music" for any reminder and Save.`);
+  }catch(e){
+    toast('🚫',e.message||'Import failed.');
+    fillSoundSelects();
+  }
+}
 function openSettings(){
   document.querySelectorAll('#notifSeg button').forEach(b=>b.classList.toggle('sel',(b.dataset.on==='1')===settings.notif));
   document.querySelectorAll('#soundSeg button').forEach(b=>b.classList.toggle('sel',(b.dataset.on==='1')===(settings.sound!==false)));
   document.getElementById('fNotifTime').value=settings.time||'20:00';
   document.getElementById('notifFields').style.display=settings.notif?'block':'none';
+  fillSoundSelects();
   updatePermLabel();
   document.getElementById('setOv').classList.add('show');
 }
@@ -790,6 +846,8 @@ async function updatePermLabel(){
         ?'📱 Native reminders active — they fire even when the app is closed.'
         :'🚫 Notifications blocked — enable them in Android Settings → Apps → Focus Forge.';
     }catch(e){el.textContent='📱 Native reminders.';}
+    updateExactRow();
+    document.getElementById('reliRow').style.display='block';
     return;
   }
   if(!('Notification'in window)){el.textContent='⚠️ This browser has no notification support.';return;}
@@ -798,10 +856,36 @@ async function updatePermLabel(){
     :p==='denied'?'🚫 Blocked in browser settings — re-enable there to get reminders.'
     :'ℹ️ You\'ll be asked to allow when you save.';
 }
+/* Android 14+ denies exact alarms by default; without them Doze can hold
+   reminders back for hours. One switch fixes it. */
+async function updateExactRow(){
+  const el=document.getElementById('exactRow');if(!el)return;
+  const st=await FFNative.exactAlarmStatus();
+  if(st==='granted'){el.innerHTML='⏰ <b>Exact reminders:</b> allowed ✅';}
+  else if(st==='denied'){
+    el.innerHTML='⚠️ <b>Exact reminders blocked</b> — Android may delay them for hours. '
+      +'<a href="#" onclick="fixExactAlarms();return false" style="color:var(--accent2)">Allow now</a>';
+  } else el.textContent='';
+}
+async function fixExactAlarms(){
+  await FFNative.requestExactAlarms(); // opens the system "Alarms & reminders" switch
+  setTimeout(updateExactRow,800);
+  rescheduleNotifs();
+}
 async function saveSettings(){
   const on=document.querySelector('#notifSeg button.sel').dataset.on==='1';
   settings.notif=on;
   settings.sound=document.querySelector('#soundSeg button.sel').dataset.on==='1';
+  const newSounds={};
+  for(const[layer,elId]of Object.entries(SND_IDS)){
+    let v=document.getElementById(elId).value;
+    if(v==='custom'&&!settings.customSound)v='default'; // custom chosen but nothing imported
+    newSounds[layer]=v;
+  }
+  if(JSON.stringify(newSounds)!==JSON.stringify(settings.sounds||{})){
+    settings.sndVer=(settings.sndVer||1)+1; // sound changed -> fresh channel ids
+  }
+  settings.sounds=newSounds;
   settings.time=document.getElementById('fNotifTime').value||'20:00';
   settings.lastFired='';
   if(on){
@@ -816,7 +900,8 @@ async function testNotif(){
   if(FFNative.isNative()){
     const ok=await FFNative.ensurePermission();
     if(!ok)return toast('🚫','Allow notifications first.');
-    await Capacitor.Plugins.LocalNotifications.schedule({notifications:[{id:99,title:'Focus Forge test 🔔',body:'Notifications are working. Streaks are safe.',schedule:{at:new Date(Date.now()+5000)}}]});
+    await FFNative.ensureChannels(FFLogic.channelSpecs(settings));
+    await Capacitor.Plugins.LocalNotifications.schedule({notifications:[{id:99,title:'Focus Forge test 🔔',body:'Notifications are working. Streaks are safe.',channelId:FFLogic.channelSpecs(settings)[0].id,schedule:{at:new Date(Date.now()+5000)}}]});
     return toast('🔔','Test arrives in 5 seconds — close the app to prove it.');
   }
   if(!('Notification'in window))return toast('⚠️','No notification support.');
@@ -940,7 +1025,15 @@ document.querySelector('.quote .a').textContent='— '+q0[1];
 bootReminderCheck();
 (async()=>{
   if(FFNative.isNative()&&settings.notif)await FFNative.ensurePermission();
-  rescheduleNotifs();
+  await rescheduleNotifs();
+  // Android 14+ blocks exact alarms by default; warn once per day if so
+  if(FFNative.isNative()&&settings.notif){
+    const st=await FFNative.exactAlarmStatus();
+    if(st==='denied'&&settings.exactWarned!==todayKey()){
+      settings.exactWarned=todayKey();saveSettingsStore();
+      toast('⚠️','Reminders may arrive late — open Settings ⚙️ and tap "Allow now".');
+    }
+  }
 })();
 // re-sync when app returns to foreground (date may have rolled over)
 document.addEventListener('visibilitychange',()=>{

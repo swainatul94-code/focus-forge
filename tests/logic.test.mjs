@@ -127,6 +127,44 @@ test('notificationPlan: only an expired deadline goal -> empty', () => {
   assert.deepEqual(L.notificationPlan([g], { notif: true, time: '20:00' }, TODAY), []);
 });
 
+test('channelSpecs: defaults -> 3 channels v1, system default sound', () => {
+  const specs = L.channelSpecs({});
+  assert.deepEqual(specs.map(s => s.id), ['ff_daily_v1', 'ff_last_v1', 'ff_morning_v1']);
+  for (const s of specs) {
+    assert.equal(s.soundName, undefined);
+    assert.equal(s.soundUri, undefined);
+    assert.equal(s.importance, 4);
+    assert.ok(Array.isArray(s.vibration));
+  }
+});
+
+test('channelSpecs: bundled tone choice -> res/raw soundName', () => {
+  const specs = L.channelSpecs({ sounds: { daily: 'chime', last: 'urgent' } });
+  assert.equal(specs[0].soundName, 'ff_chime.wav');
+  assert.equal(specs[1].soundName, 'ff_urgent.wav');
+  assert.equal(specs[2].soundName, undefined); // morning unset -> default
+});
+
+test('channelSpecs: custom sound uses imported uri; without import falls back to default', () => {
+  const withImport = L.channelSpecs({ sounds: { daily: 'custom' }, customSound: { uri: 'content://media/123', name: 'song.mp3' } });
+  assert.equal(withImport[0].soundUri, 'content://media/123');
+  const noImport = L.channelSpecs({ sounds: { daily: 'custom' } });
+  assert.equal(noImport[0].soundUri, undefined);
+  assert.equal(noImport[0].soundName, undefined);
+});
+
+test('channelSpecs: sndVer bump changes channel ids', () => {
+  assert.equal(L.channelSpecs({ sndVer: 3 })[0].id, 'ff_daily_v3');
+});
+
+test('notificationPlan: items carry per-layer channelIds', () => {
+  const goals = [{ id: 'a', title: 'Read', emoji: '📚', checkins: {}, start: TODAY, type: 'streak' }];
+  const plan = L.notificationPlan(goals, { notif: true, time: '20:00', sndVer: 2 }, TODAY);
+  assert.equal(plan[0].channelId, 'ff_daily_v2');
+  assert.equal(plan[1].channelId, 'ff_last_v2');
+  assert.equal(plan[2].channelId, 'ff_morning_v2');
+});
+
 test('notificationPlan: expired deadline goal excluded from pending count', () => {
   const expired = { id: 'd', title: 'Sprint', emoji: '🎯', checkins: {}, start: '2026-06-01', type: 'deadline', targetDays: 3 };
   const live = { id: 'a', title: 'Read', emoji: '📚', checkins: {}, start: TODAY, type: 'streak' };

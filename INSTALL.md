@@ -39,6 +39,22 @@ The build produces `FocusForge.apk` in this folder. Move it to your phone any wa
 
 - **❄ Streak freeze:** every 7-day streak earns a freeze token (max 2). Miss a single day and a token is spent automatically — the chain survives. The frozen day shows blue in the heatmap.
 - **📊 Stats:** button in the header — completion %, total check-ins, longest streak per goal, and a weekly bar chart.
+- **🎵 Notification tones (v1.1):** Settings → "Notification tones" — each of the three reminders (daily / last-chance / morning) can have its own sound: System default, Chime, Urgent beeps, Soft tone, Digital, or **My music** — pick any audio file from your phone with "My music 🎵" and it becomes the notification sound. Each reminder type also has a distinct vibration pattern.
+
+## ⚠️ Reminders not arriving when the app is closed?
+
+Three things to check, in order:
+
+1. **Exact reminders (Android 12+, blocked by default on Android 14+).**
+   Open the app → Settings ⚙️ → if you see *"Exact reminders blocked"*, tap **Allow now** and flip the switch (*Alarms & reminders → Allow*). Without this, Android delays reminders by hours or skips them entirely. The app also warns you on launch if this is off.
+
+2. **Battery optimization.**
+   Android Settings → Apps → Focus Forge → **Battery → Unrestricted**. On Xiaomi/Oppo/Vivo/OnePlus also enable **Autostart** for the app and "lock" it in the recent-apps screen (pull down on its card) so swiping other apps away doesn't kill its alarms.
+
+3. **Do Not Disturb / notification channel.**
+   Check the notification isn't silenced: Android Settings → Apps → Focus Forge → Notifications → all channels enabled, sound on.
+
+After changing any of these, open the app once so it reschedules everything.
 
 ## Publishing to the Play Store
 
@@ -117,7 +133,7 @@ Google reviews new apps in 1–7 days. You will get an email when it goes live.
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-npx cap sync android
+npm run sync     # cap sync + re-applies manifest/sound patches
 cd android
 .\gradlew.bat assembleDebug
 ```
@@ -131,7 +147,7 @@ Copy `android\app\build\outputs\apk\debug\app-debug.apk` to the phone and instal
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
-npx cap sync android
+npm run sync     # cap sync + re-applies manifest/sound patches
 cd android
 .\gradlew.bat bundleRelease
 ```
@@ -146,7 +162,11 @@ Upload the AAB in Play Console → Production → Create new release.
 
 ## Restoring the signing config after `npx cap add android`
 
-If the `android\` folder is ever deleted and regenerated, two files must be recreated:
+If the `android\` folder is ever deleted and regenerated:
+
+1. Run `npm run sync` — this re-applies the SCHEDULE_EXACT_ALARM permission, copies the notification tones into `res/raw`, and fixes `file_paths.xml` automatically.
+2. Re-set `versionCode` / `versionName` in `android\app\build.gradle` (current: 2 / "1.1").
+3. Recreate the two signing files below.
 
 **`android\keystore.properties`** (create this file — use the passwords from your secure backup):
 ```properties

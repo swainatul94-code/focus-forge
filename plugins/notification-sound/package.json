@@ -1,0 +1,17 @@
+{
+  "name": "notification-sound",
+  "version": "1.0.0",
+  "description": "Focus Forge local Capacitor plugin: notification channels with custom sounds imported from the user's music",
+  "main": "index.js",
+  "license": "MIT",
+  "keywords": ["capacitor", "plugin", "native"],
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  },
+  "files": ["android/", "index.js"]
+}

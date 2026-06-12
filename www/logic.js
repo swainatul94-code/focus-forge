@@ -87,10 +87,38 @@
     return buckets;
   }
 
+  /* bundled tone name -> res/raw file (without path) */
+  const SOUNDS = { chime: 'ff_chime', urgent: 'ff_urgent', soft: 'ff_soft', digital: 'ff_digital' };
+
+  /* Android 8+ fixes a channel's sound at creation time — it can never be
+     changed. So each reminder layer gets its own channel, and the ids carry a
+     version (settings.sndVer): changing any sound bumps the version, fresh
+     channels are created and native.js deletes the stale ff_* ones. */
+  function channelSpecs(settings) {
+    const v = settings.sndVer || 1;
+    const sounds = settings.sounds || {};
+    const layers = [
+      { key: 'daily',   name: 'Daily reminder',       vibration: [0, 250, 150, 250] },
+      { key: 'last',    name: 'Last-chance nudge',    vibration: [0, 400, 150, 400, 150, 400] },
+      { key: 'morning', name: 'Morning streak alert', vibration: [0, 200] }
+    ];
+    return layers.map(L => {
+      const spec = { key: L.key, id: 'ff_' + L.key + '_v' + v, name: L.name,
+                     importance: 4, vibration: L.vibration };
+      const choice = sounds[L.key] || 'default';
+      if (choice === 'custom' && settings.customSound && settings.customSound.uri) {
+        spec.soundUri = settings.customSound.uri;
+      } else if (SOUNDS[choice]) {
+        spec.soundName = SOUNDS[choice] + '.wav';
+      } // neither set -> system default notification sound
+      return spec;
+    });
+  }
+
   /* declarative plan; native.js turns it into plugin calls.
-     id 1: daily repeating at settings.time
-     id 2: last-chance repeating 21:30
-     id 3: one-shot tomorrow 09:00, only if something is pending now */
+     id 1: daily repeating at settings.time     -> 'daily' channel
+     id 2: last-chance repeating 21:30          -> 'last' channel
+     id 3: one-shot tomorrow 09:00, only if something is pending now -> 'morning' */
   function notificationPlan(goals, settings, todayKey) {
     if (!settings.notif) return [];
     const active = goals.filter(g => !isExpiredDeadline(g, todayKey));
@@ -98,15 +126,17 @@
     const pending = active.filter(g => !g.checkins[todayKey]);
     const n = pending.length;
     const [h, m] = (settings.time || '20:00').split(':').map(Number);
+    const chan = {};
+    for (const s of channelSpecs(settings)) chan[s.key] = s.id;
     const plan = [
       {
-        id: 1, on: { hour: h, minute: m },
+        id: 1, on: { hour: h, minute: m }, channelId: chan.daily,
         title: 'Focus Forge — check-in time',
         body: n > 0 ? `${n} goal${n > 1 ? 's' : ''} still need a check-in today. Keep the streak alive 🔥`
                     : 'Daily check-in time. Keep the streak alive 🔥'
       },
       {
-        id: 2, on: { hour: 21, minute: 30 },
+        id: 2, on: { hour: 21, minute: 30 }, channelId: chan.last,
         title: 'Last chance today ⏰',
         body: 'Still unchecked goals. A 30-second check-in saves the streak.'
       }
@@ -114,7 +144,7 @@
     if (n > 0) {
       const names = pending.slice(0, 3).map(g => g.emoji + ' ' + g.title).join(', ');
       plan.push({
-        id: 3, at: addDays(todayKey, 1) + 'T09:00',
+        id: 3, at: addDays(todayKey, 1) + 'T09:00', channelId: chan.morning,
         title: 'Streak at risk ⚠️',
         body: `Yesterday you missed: ${names}${n > 3 ? '…' : ''}. Check in today to recover.`
       });
@@ -123,7 +153,8 @@
   }
 
   const FFLogic = { iso, parse, addDays, daysBetween, currentStreak, freezeSpendDays,
-    freezeEarn, longestStreak, statsForGoal, weeklyCounts, notificationPlan, isExpiredDeadline };
+    freezeEarn, longestStreak, statsForGoal, weeklyCounts, notificationPlan, isExpiredDeadline,
+    channelSpecs, SOUNDS };
   if (typeof module !== 'undefined' && module.exports) module.exports = FFLogic;
   else global.FFLogic = FFLogic;
 })(typeof window !== 'undefined' ? window : globalThis);
